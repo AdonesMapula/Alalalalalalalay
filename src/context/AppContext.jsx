@@ -220,6 +220,60 @@ export const AppProvider = ({ children }) => {
     loadDynamicSupabaseData();
   }, []);
 
+  // Synchronize documents specifically for the active logged in user from database/admin
+  useEffect(() => {
+    const loadUserDocuments = async () => {
+      if (!user?.email) return;
+
+      // 1. If user has attached documents on user object (from managedUsers/Supabase profile)
+      if (user.documents && user.documents.length > 0) {
+        const formatted = user.documents.map((d, i) => ({
+          id: d.id || `doc_${Date.now()}_${i}`,
+          name: d.name,
+          type: d.type || 'Identity Card',
+          category: d.category || 'Government ID',
+          status: d.status || 'Valid',
+          fileSize: d.fileSize || d.size || d.file_size || '1.4 MB',
+          fileType: d.fileType || d.file_type || 'PDF',
+          verifiedBadge: 'Super Admin Verified ✓',
+          uploadedAt: 'Synced from Super Admin Vault',
+          thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+        }));
+        setDocuments(formatted);
+        localStorage.setItem('alalay_documents', JSON.stringify(formatted));
+        return;
+      }
+
+      // 2. Fetch directly from Supabase if user has an id
+      if (isSupabaseConfigured && user.id && !user.id.startsWith('usr_')) {
+        const { data: dbDocs } = await fetchDocumentsByUserId(user.id);
+        if (dbDocs && dbDocs.length > 0) {
+          const formatted = dbDocs.map((d) => ({
+            id: d.id,
+            name: d.name,
+            type: d.type || 'Identity Card',
+            category: d.category || 'Government ID',
+            status: d.status || 'Valid',
+            fileSize: d.file_size || '1.4 MB',
+            fileType: d.file_type || 'PDF',
+            verifiedBadge: 'Super Admin Verified ✓',
+            uploadedAt: 'Synced from Database',
+            thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+          }));
+          setDocuments(formatted);
+          localStorage.setItem('alalay_documents', JSON.stringify(formatted));
+          return;
+        }
+      }
+
+      // 3. If no documents found for this user, vault is empty
+      setDocuments([]);
+      localStorage.removeItem('alalay_documents');
+    };
+
+    loadUserDocuments();
+  }, [user?.id, user?.email]);
+
   // Complete Onboarding Wizard & Sync Admin Documents to Document Locker
   const completeOnboardingWizard = (syncedDocs = []) => {
     setOnboardingCompleted(true);
@@ -567,7 +621,10 @@ export const AppProvider = ({ children }) => {
 
   const logout = () => {
     setIsAuthenticated(false);
+    setUser(INITIAL_USER);
+    setDocuments([]);
     localStorage.setItem('alalay_auth', 'false');
+    localStorage.removeItem('alalay_documents');
     addToast('Logged Out', 'You have been signed out.', 'info');
   };
 
