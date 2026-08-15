@@ -14,6 +14,7 @@ import {
   Shield,
   Star,
   CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { KnowledgeSourcesView } from './KnowledgeSourcesView';
@@ -32,6 +33,7 @@ export const AdminDashboard = () => {
     addToast,
     sources,
     reviewQueue,
+    setTempAdminModalOpen,
   } = useApp();
 
   const [searchAdminQuery, setSearchAdminQuery] = useState('');
@@ -140,6 +142,15 @@ export const AdminDashboard = () => {
 
           {/* Right Action Icons & Avatar */}
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setTempAdminModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-bold shadow-2xs cursor-pointer transition-colors"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>+ Temp Admin</span>
+            </button>
+
             <button
               type="button"
               className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-600 cursor-pointer"

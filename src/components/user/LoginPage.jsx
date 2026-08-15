@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Landmark, ArrowLeft, Shield, Sparkles } from 'lucide-react';
+import { Landmark, ArrowLeft, Shield, Sparkles, Clock } from 'lucide-react';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { useApp } from '../../context/AppContext';
 
 export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin }) => {
-  const { loginWithSupabase } = useApp();
+  const { loginWithSupabase, setTempAdminModalOpen, setViewMode } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,15 +41,29 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
           </button>
         )}
 
-        {onOpenAdmin && (
+        <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onOpenAdmin}
-            className="text-xs font-bold text-[#093a96] hover:underline cursor-pointer bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-2xs"
+            onClick={() => {
+              setViewMode('admin');
+              setTempAdminModalOpen(true);
+            }}
+            className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-full border border-amber-200 shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
           >
-            Super Admin Portal →
+            <Clock className="w-3.5 h-3.5 text-amber-600" />
+            <span>Temp Admin Sign Up</span>
           </button>
-        )}
+
+          {onOpenAdmin && (
+            <button
+              type="button"
+              onClick={onOpenAdmin}
+              className="text-xs font-bold text-[#093a96] hover:underline cursor-pointer bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-2xs"
+            >
+              Super Admin Portal →
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Login Card matching reference design */}
@@ -171,15 +185,30 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
         </form>
 
         {/* Footer */}
-        <div className="pt-2 text-xs text-slate-500">
-          <span>Don't have an account? </span>
-          <button
-            type="button"
-            onClick={onSignUp || onContinueToVerify}
-            className="font-bold text-[#093a96] hover:underline cursor-pointer"
-          >
-            Sign up
-          </button>
+        <div className="pt-2 text-xs text-slate-500 space-y-2">
+          <div>
+            <span>Don't have an account? </span>
+            <button
+              type="button"
+              onClick={onSignUp || onContinueToVerify}
+              className="font-bold text-[#093a96] hover:underline cursor-pointer"
+            >
+              Sign up
+            </button>
+          </div>
+          <div className="pt-1 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('admin');
+                setTempAdminModalOpen(true);
+              }}
+              className="font-bold text-amber-700 hover:underline cursor-pointer inline-flex items-center gap-1 text-[11px]"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Temporary Admin Sign Up →</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

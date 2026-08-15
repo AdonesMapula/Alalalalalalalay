@@ -90,8 +90,45 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : AUDIT_LOGS;
   });
 
-  const [managedUsers, setManagedUsers] = useState([]);
+  const [managedUsers, setManagedUsers] = useState(() => {
+    const saved = localStorage.getItem('alalay_managed_users');
+    return saved
+      ? JSON.parse(saved)
+      : [
+          {
+            id: 'usr_admin_1',
+            firstName: 'Super',
+            lastName: 'Admin',
+            name: 'Super Admin',
+            email: 'admin@alalay.gov.ph',
+            role: 'System Admin',
+            status: 'Active',
+            isTemporary: false,
+            avatarInitials: 'SA',
+            avatarBg: 'bg-indigo-600',
+            otpCode: '891024',
+            documents: [{ name: 'System Admin Authorization.pdf', type: 'Authorization', size: '1.2 MB' }],
+            createdAt: '2026-08-15',
+          },
+          {
+            id: 'usr_mod_2',
+            firstName: 'Content',
+            lastName: 'Moderator',
+            name: 'Content Moderator',
+            email: 'moderator@alalay.gov.ph',
+            role: 'Content Moderator',
+            status: 'Active',
+            isTemporary: false,
+            avatarInitials: 'CM',
+            avatarBg: 'bg-amber-600',
+            otpCode: '452109',
+            documents: [],
+            createdAt: '2026-08-15',
+          },
+        ];
+  });
   const [addUserModalOpen, setAddUserModalOpen] = useState(false);
+  const [tempAdminModalOpen, setTempAdminModalOpen] = useState(false);
 
   // UI Modals & Filter States
   const [selectedOpportunity, setSelectedOpportunity] = useState(null);
@@ -170,6 +207,11 @@ export const AppProvider = ({ children }) => {
     loadDynamicSupabaseData();
   }, []);
 
+  // Sync Managed Users to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('alalay_managed_users', JSON.stringify(managedUsers));
+  }, [managedUsers]);
+
   // Authentication Handlers
   const loginWithSupabase = async (emailInput, passwordInput) => {
     const cleanEmail = emailInput?.trim();
@@ -178,7 +220,51 @@ export const AppProvider = ({ children }) => {
       return { success: false };
     }
 
-    // Check user profile in Supabase
+    // 1. Check local managedUsers array first (for newly created temp admins & registered users)
+    const localMatch = managedUsers.find(
+      (u) => u.email?.toLowerCase() === cleanEmail.toLowerCase()
+    );
+
+    if (localMatch) {
+      const isAdminRole = [
+        'System Admin',
+        'Super Admin',
+        'Content Moderator',
+        'Analyst',
+        'Agency Verifier',
+        'super_admin',
+        'content_moderator',
+      ].includes(localMatch.role);
+
+      setUser({
+        id: localMatch.id,
+        firstName: localMatch.firstName,
+        lastName: localMatch.lastName,
+        email: localMatch.email,
+        role: localMatch.role,
+        isVerified: true,
+      });
+
+      setIsAuthenticated(true);
+      localStorage.setItem('alalay_auth', 'true');
+
+      if (isAdminRole) {
+        setViewMode('admin');
+        addToast(
+          'Admin Authenticated',
+          `Welcome back, ${localMatch.name} (${localMatch.role}).`,
+          'success'
+        );
+        return { success: true, isAdmin: true };
+      } else {
+        setViewMode('user');
+        setOnboardingCompleted(true);
+        addToast('Welcome Back', `Logged in as ${localMatch.name}.`, 'success');
+        return { success: true, isAdmin: false };
+      }
+    }
+
+    // 2. Check user profile in Supabase
     const { data: profile } = await findProfileByEmail(cleanEmail);
 
     if (profile) {
@@ -224,6 +310,91 @@ export const AppProvider = ({ children }) => {
         return { success: true, isAdmin: false };
       }
     }
+  };
+
+  // Create Temporary Admin Account
+  const createTempAdminAccount = async ({
+    firstName,
+    lastName,
+    email,
+    role = 'System Admin',
+    durationHours = 24,
+    otpCode,
+    autoLogin = false,
+  }) => {
+    const initials = `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || 'TA';
+    const dbRole = (role || 'System Admin').toLowerCase().replace(' ', '_');
+    const generatedOtp = otpCode || Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
+
+    const newTempAdmin = {
+      id: `tmp_admin_${Date.now()}`,
+      firstName,
+      lastName,
+      name: `${firstName} ${lastName}`.trim(),
+      email,
+      role: role || 'System Admin',
+      status: `Temp (${durationHours}h)`,
+      isTemporary: true,
+      expiresAt,
+      durationHours,
+      avatarInitials: initials,
+      avatarBg: 'bg-amber-600',
+      otpCode: generatedOtp,
+      documents: [{ name: 'Temporary Admin Access Token.pdf', type: 'System Token', size: '240 KB' }],
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+
+    // 1. Insert Profile into Supabase if configured
+    if (isSupabaseConfigured) {
+      await createProfileInSupabase({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        role: ['super_admin', 'content_moderator', 'analyst', 'agency_verifier', 'citizen'].includes(dbRole)
+          ? dbRole
+          : 'super_admin',
+        otp_code: generatedOtp,
+        status: `Temp (${durationHours}h)`,
+        avatar_initials: initials,
+        egov_verified: true,
+      });
+    }
+
+    // 2. Update React State
+    setManagedUsers((prev) => [newTempAdmin, ...prev]);
+
+    // 3. Create Audit Log
+    await createAuditLog({
+      action: 'TEMP_ADMIN_CREATED',
+      actor: 'Super Admin',
+      target: `${newTempAdmin.name} (${newTempAdmin.email})`,
+      status: 'Success',
+      details: `Generated temporary admin account expiring in ${durationHours}h with OTP passcode ${generatedOtp}.`,
+    });
+
+    addToast(
+      'Temp Admin Activated',
+      `Temporary Admin ${newTempAdmin.name} created! OTP Passcode: ${generatedOtp}`,
+      'success',
+      7000
+    );
+
+    if (autoLogin) {
+      setUser({
+        id: newTempAdmin.id,
+        firstName,
+        lastName,
+        email,
+        role: newTempAdmin.role,
+        isVerified: true,
+      });
+      setIsAuthenticated(true);
+      setViewMode('admin');
+      localStorage.setItem('alalay_auth', 'true');
+    }
+
+    return newTempAdmin;
   };
 
   const logout = () => {
@@ -387,6 +558,9 @@ export const AppProvider = ({ children }) => {
         addUserModalOpen,
         setAddUserModalOpen,
         addManagedUser,
+        tempAdminModalOpen,
+        setTempAdminModalOpen,
+        createTempAdminAccount,
         // Modals & UI
         selectedOpportunity,
         setSelectedOpportunity,
