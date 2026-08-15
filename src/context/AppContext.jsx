@@ -318,6 +318,7 @@ export const AppProvider = ({ children }) => {
     firstName,
     lastName,
     email,
+    password = 'admin123',
     role = 'System Admin',
     durationHours = 24,
     otpCode,
