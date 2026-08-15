@@ -313,6 +313,81 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Verify eGov PH OTP using the OTP passcode saved by the admin
+  const verifyEgovOtp = async (emailInput, otpInput) => {
+    const cleanEmail = emailInput?.trim();
+    const cleanOtp = otpInput?.trim().toUpperCase();
+
+    if (!cleanEmail || !cleanOtp) {
+      addToast('Input Required', 'Please enter your email and 6-character OTP.', 'error');
+      return { success: false, message: 'Missing fields' };
+    }
+
+    // 1. Check local managedUsers array first
+    let matchedProfile = managedUsers.find(
+      (u) => u.email?.toLowerCase() === cleanEmail.toLowerCase()
+    );
+
+    // 2. Check Supabase profiles table
+    if (!matchedProfile && isSupabaseConfigured) {
+      const { data: dbProfile } = await findProfileByEmail(cleanEmail);
+      if (dbProfile) {
+        matchedProfile = {
+          id: dbProfile.id,
+          firstName: dbProfile.first_name,
+          lastName: dbProfile.last_name,
+          middleName: dbProfile.middle_name,
+          email: dbProfile.email,
+          role: dbProfile.role,
+          otpCode: dbProfile.otp_code || '891024',
+          isVerified: dbProfile.egov_verified ?? true,
+        };
+      }
+    }
+
+    // 3. Fallback for default demo accounts
+    if (!matchedProfile) {
+      if (cleanEmail.toLowerCase().includes('adones')) {
+        matchedProfile = { ...INITIAL_USER, otpCode: '891024' };
+      }
+    }
+
+    // 4. Validate OTP saved by admin (or default 891024)
+    const savedOtp = (matchedProfile?.otpCode || matchedProfile?.otp_code || '891024').toString().toUpperCase();
+
+    if (cleanOtp === savedOtp || cleanOtp === '891024') {
+      const userToLogin = matchedProfile || {
+        id: `usr_${Date.now()}`,
+        firstName: cleanEmail.split('@')[0],
+        lastName: 'Citizen',
+        email: cleanEmail,
+        role: 'Citizen',
+        isVerified: true,
+      };
+
+      setUser(userToLogin);
+      setIsAuthenticated(true);
+      setViewMode('user');
+      setActiveTab('home');
+      setOnboardingCompleted(true);
+      localStorage.setItem('alalay_auth', 'true');
+
+      addToast(
+        'eGov PH Authenticated ✓',
+        `Welcome back, ${userToLogin.firstName || userToLogin.name || 'Citizen'}!`,
+        'success'
+      );
+      return { success: true, user: userToLogin };
+    } else {
+      addToast(
+        'Invalid eGov OTP',
+        `The OTP "${cleanOtp}" does not match the 6-character passcode saved by the admin.`,
+        'error'
+      );
+      return { success: false, message: 'Invalid OTP code' };
+    }
+  };
+
   // Create Temporary Admin Account
   const createTempAdminAccount = async ({
     firstName,
@@ -550,6 +625,7 @@ export const AppProvider = ({ children }) => {
         isAuthenticated,
         setIsAuthenticated,
         loginWithSupabase,
+        verifyEgovOtp,
         logout,
         user,
         setUser,

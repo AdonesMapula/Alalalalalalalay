@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
-import { Landmark, ArrowLeft, Shield, Sparkles, Clock, UserCheck, KeyRound } from 'lucide-react';
+import { Landmark, ArrowLeft, Shield, Sparkles, Clock, UserCheck, KeyRound, CheckCircle2 } from 'lucide-react';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { useApp } from '../../context/AppContext';
 
 export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin }) => {
-  const { loginWithSupabase, setTempAdminModalOpen, createTempAdminAccount, setViewMode } = useApp();
+  const { loginWithSupabase, verifyEgovOtp, setTempAdminModalOpen, createTempAdminAccount, setViewMode } = useApp();
   
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'adminSignUp'
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'egov' | 'adminSignUp'
 
-  // Login State
+  // Standard Login State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // eGov PH Login Flow State
+  const [egovStep, setEgovStep] = useState(1); // 1: Email Input | 2: OTP Passcode Input
+  const [egovEmail, setEgovEmail] = useState('adones.santos@egov.ph');
+  const [egovOtp, setEgovOtp] = useState('');
 
   // Admin Sign Up State
   const [signUpFirstName, setSignUpFirstName] = useState('');
@@ -32,9 +37,24 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
       if (result.isAdmin && onOpenAdmin) {
         onOpenAdmin();
       }
-    } else {
+    } else if (onContinueToVerify) {
       onContinueToVerify();
     }
+  };
+
+  const handleEgovEmailSubmit = (e) => {
+    e.preventDefault();
+    if (!egovEmail) return;
+    setEgovStep(2);
+  };
+
+  const handleEgovOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!egovEmail || !egovOtp) return;
+
+    setIsLoading(true);
+    await verifyEgovOtp(egovEmail, egovOtp);
+    setIsLoading(false);
   };
 
   const handleAdminSignUpSubmit = async (e) => {
@@ -153,6 +173,20 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
           </button>
           <button
             type="button"
+            onClick={() => {
+              setAuthMode('egov');
+              setEgovStep(1);
+            }}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              authMode === 'egov'
+                ? 'bg-[#141870] text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            eGov PH Login
+          </button>
+          <button
+            type="button"
             onClick={() => setAuthMode('adminSignUp')}
             className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               authMode === 'adminSignUp'
@@ -164,14 +198,16 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
           </button>
         </div>
 
-        {/* CONDITIONAL RENDER: LOGIN FORM */}
-        {authMode === 'login' ? (
+        {/* 1. STANDARD LOGIN FORM */}
+        {authMode === 'login' && (
           <>
-            {/* Primary CTA: "Sign in with eGov PH" */}
             <div>
               <button
                 type="button"
-                onClick={onContinueToVerify}
+                onClick={() => {
+                  setAuthMode('egov');
+                  setEgovStep(1);
+                }}
                 className="w-full flex items-center justify-center gap-2.5 py-3.5 px-5 rounded-2xl bg-[#141870] hover:bg-[#0c1055] text-white text-sm font-bold shadow-md shadow-blue-950/20 cursor-pointer transition-all active:scale-[0.98]"
               >
                 <Landmark className="w-4 h-4" />
@@ -179,7 +215,6 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
               </button>
             </div>
 
-            {/* Divider */}
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-slate-200" />
               <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">
@@ -188,7 +223,6 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
               <div className="flex-1 h-px bg-slate-200" />
             </div>
 
-            {/* Login Form */}
             <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -215,18 +249,8 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
                   placeholder="••••••••"
                   className="w-full bg-[#f8fafc] text-slate-800 text-sm rounded-xl px-4 py-3 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white transition-all placeholder:text-slate-400"
                 />
-                <div className="text-right pt-1.5">
-                  <a
-                    href="#"
-                    onClick={(e) => e.preventDefault()}
-                    className="text-xs font-semibold text-[#093a96] hover:underline"
-                  >
-                    Forgot password?
-                  </a>
-                </div>
               </div>
 
-              {/* Login Submit Button */}
               <div className="pt-2">
                 <button
                   type="submit"
@@ -238,8 +262,99 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
               </div>
             </form>
           </>
-        ) : (
-          /* CONDITIONAL RENDER: ADMIN SIGN UP FORM */
+        )}
+
+        {/* 2. EGOV PH OTP VERIFICATION FORM FLOW */}
+        {authMode === 'egov' && (
+          <div className="space-y-4 text-left">
+            <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-xs text-[#093a96] space-y-1">
+              <span className="font-bold flex items-center gap-1.5">
+                <Landmark className="w-4 h-4" />
+                <span>eGov PH Identity Authentication</span>
+              </span>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                {egovStep === 1
+                  ? 'Input your registered email address to proceed to 6-character OTP verification.'
+                  : `Enter the 6-character OTP passcode saved by the admin for ${egovEmail}.`}
+              </p>
+            </div>
+
+            {egovStep === 1 ? (
+              <form onSubmit={handleEgovEmailSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    eGov Registered Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={egovEmail}
+                    onChange={(e) => setEgovEmail(e.target.value)}
+                    placeholder="adones.santos@egov.ph"
+                    className="w-full bg-[#f8fafc] text-slate-800 text-sm rounded-xl px-4 py-3 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white transition-all"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 px-5 rounded-2xl bg-[#141870] hover:bg-[#0c1055] text-white text-sm font-bold shadow-md shadow-blue-950/20 transition-all cursor-pointer"
+                >
+                  Continue to eGov OTP →
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleEgovOtpSubmit} className="space-y-4">
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-center justify-between">
+                  <span className="text-[11px] font-medium">Testing saved admin OTP?</span>
+                  <button
+                    type="button"
+                    onClick={() => setEgovOtp('891024')}
+                    className="px-2 py-1 rounded-md bg-white border border-amber-300 font-mono font-bold text-[#093a96] hover:bg-amber-100 cursor-pointer shadow-2xs"
+                  >
+                    Autofill (891024)
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>6-Character eGov OTP Passcode *</span>
+                    <button
+                      type="button"
+                      onClick={() => setEgovStep(1)}
+                      className="text-[11px] text-[#093a96] hover:underline"
+                    >
+                      Change Email
+                    </button>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    required
+                    value={egovOtp}
+                    onChange={(e) => setEgovOtp(e.target.value.toUpperCase())}
+                    placeholder="891024"
+                    className="w-full font-mono font-black text-center text-xl tracking-widest bg-[#f8fafc] text-[#093a96] rounded-xl px-4 py-3 outline-none border border-slate-300 focus:border-[#093a96] focus:bg-white transition-all uppercase"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Uses the OTP passcode saved by the admin for your account.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl bg-[#093a96] hover:bg-[#072d75] disabled:opacity-50 text-white text-sm font-bold shadow-md shadow-blue-900/20 transition-all cursor-pointer"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  <span>{isLoading ? 'Verifying OTP...' : 'Verify OTP & Open User Dashboard'}</span>
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
+        {/* 3. ADMIN SIGN UP FORM */}
+        {authMode === 'adminSignUp' && (
           <form onSubmit={handleAdminSignUpSubmit} className="space-y-4 text-left">
             <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
               <span className="font-bold block">Online Admin Registration</span>
