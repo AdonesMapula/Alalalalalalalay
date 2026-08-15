@@ -8,6 +8,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { askAlalayAI } from '../../services/geminiService';
 
 export const AskAlalayChatModal = () => {
   const {
@@ -30,11 +31,9 @@ export const AskAlalayChatModal = () => {
         {
           id: 'msg_1',
           sender: 'ai',
-          text: `Hi ${user.firstName}, I can help you with your ${
-            opp ? opp.title : 'government benefits'
-          }. What would you like to know?`,
+          text: `Hi ${user.firstName}, I am ALALAY, your AI government and healthcare navigator with 8-layer safety guardrails. What would you like to know?`,
           time: 'Just now',
-          sourceUrl: opp?.officialSource?.url,
+          sourceUrl: opp?.officialSource?.url || 'https://www.philhealth.gov.ph',
         },
       ]);
     }
@@ -50,9 +49,10 @@ export const AskAlalayChatModal = () => {
     'Am I eligible?',
     'What documents do I need?',
     'Where to apply?',
+    'Why do I still owe ₱12,700?',
   ];
 
-  const handleSendMessage = (textToSend) => {
+  const handleSendMessage = async (textToSend) => {
     const text = textToSend || inputValue.trim();
     if (!text) return;
 
@@ -67,31 +67,29 @@ export const AskAlalayChatModal = () => {
     setInputValue('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      let replyText = '';
-      const lower = text.toLowerCase();
-
-      if (lower.includes('eligible') || lower.includes('qualify') || lower.includes('am i')) {
-        replyText = `Based on your profile, you meet the **Age Requirement (62 years old)** and **Residency** for PhilHealth Senior Benefits. You qualify for 100% covered inpatient care and free Konsulta outpatient primary checkups.`;
-      } else if (lower.includes('document') || lower.includes('need') || lower.includes('require')) {
-        replyText = `You will need:\n1. Filled out PhilHealth Member Registration Form (PMRF)\n2. Valid OSCA Senior Citizen ID or Government Photo ID\n3. 1x1 ID Picture`;
-      } else if (lower.includes('where') || lower.includes('apply')) {
-        replyText = `You can apply at any PhilHealth Local Health Insurance Office (LHIO) or directly through the OSCA (Office of Senior Citizen Affairs) in your City Hall.`;
-      } else {
-        replyText = `According to the official circular verified from philhealth.gov.ph, all senior citizens aged 60+ are entitled to mandatory PhilHealth coverage under Republic Act 10645.`;
-      }
-
+    try {
+      const replyText = await askAlalayAI(text, opp ? 'benefit' : 'general');
       const aiMsg = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
         text: replyText,
         time: 'Just now',
-        sourceUrl: 'https://www.philhealth.gov.ph',
+        sourceUrl: opp?.officialSource?.url || 'https://www.philhealth.gov.ph',
       };
-
       setMessages((prev) => [...prev, aiMsg]);
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `ai_${Date.now()}`,
+          sender: 'ai',
+          text: 'ALALAY is grounded in verified Citizen Charters. Please check with your local government office or Malasakit Center.',
+          time: 'Just now',
+        },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 900);
+    }
   };
 
   return (

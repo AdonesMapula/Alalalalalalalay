@@ -18,7 +18,8 @@ export const KnowledgeSourcesView = () => {
   const {
     sources,
     setAddSourceModalOpen,
-    runLiveScrapeSimulation,
+    runLiveScraper,
+    isScrapingLive,
   } = useApp();
 
   const [selectedFilter, setSelectedFilter] = useState('All Sources');
@@ -60,8 +61,8 @@ export const KnowledgeSourcesView = () => {
   });
 
   return (
-    <div className="space-y-8 select-none max-w-7xl mx-auto">
-      {/* Header Section matching reference image */}
+    <div className="space-y-6 select-none max-w-7xl mx-auto">
+      {/* Top Header Row matching reference image */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">
@@ -72,14 +73,26 @@ export const KnowledgeSourcesView = () => {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setAddSourceModalOpen(true)}
-          className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#141870] hover:bg-[#0c1055] text-white text-xs font-bold shadow-md shadow-blue-950/20 cursor-pointer transition-all active:scale-[0.98]"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Source</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={isScrapingLive}
+            onClick={() => runLiveScraper()}
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-[#093a96] text-xs font-bold border border-slate-200 cursor-pointer transition-all active:scale-[0.98] disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isScrapingLive ? 'animate-spin' : ''}`} />
+            <span>{isScrapingLive ? 'Syncing...' : 'Sync Scraper'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAddSourceModalOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#141870] hover:bg-[#0c1055] text-white text-xs font-bold shadow-md shadow-blue-950/20 cursor-pointer transition-all active:scale-[0.98]"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Source</span>
+          </button>
+        </div>
       </div>
 
       {/* 3 Metric Stat Cards matching reference image */}

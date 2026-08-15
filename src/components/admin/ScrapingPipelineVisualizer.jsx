@@ -17,7 +17,7 @@ import { IOSButton } from '../common/IOSButton';
 import { IOSCard } from '../common/IOSCard';
 
 export const ScrapingPipelineVisualizer = () => {
-  const { runLiveScrapeSimulation, isScrapingLive, scrapingProgress } = useApp();
+  const { runLiveScraper, isScrapingLive, scrapingProgress } = useApp();
 
   const pipelineStages = [
     { id: 1, title: 'Gov Website URL', desc: 'Approved Agency Portals (.gov.ph)', icon: Globe, color: '#007AFF' },
@@ -53,10 +53,10 @@ export const ScrapingPipelineVisualizer = () => {
           size="md"
           icon={Play}
           loading={isScrapingLive}
-          onClick={() => runLiveScrapeSimulation()}
+          onClick={() => runLiveScraper()}
           className="shadow-md shadow-blue-500/20"
         >
-          {isScrapingLive ? 'Executing Scraping Pipeline...' : 'Run Pipeline Simulation'}
+          {isScrapingLive ? 'Executing Scraping Pipeline...' : 'Run Live Facebook Scraper Pipeline'}
         </IOSButton>
       </div>
 
