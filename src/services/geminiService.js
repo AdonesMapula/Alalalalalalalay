@@ -284,13 +284,24 @@ export async function askAlalayAI(userQuestion, contextType = 'general') {
 
   for (const model of models) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${getApiKey()}`;
+      const isBearerToken = apiKey.startsWith('AQ.') || apiKey.startsWith('ya29.');
+      const url = isBearerToken
+        ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
+        : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+
+      if (isBearerToken) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      } else {
+        headers['x-goog-api-key'] = apiKey;
+      }
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           contents: [
             {
