@@ -3,11 +3,12 @@ import { getDictionaryContext, getLabReferenceContext } from './dictionaryServic
 let isPrimaryKeyExhausted = false;
 let activeKeyType = 'primary';
 
-// 1. Dual-Key Management (Supporting Vite env variables & fallbacks)
+// 1. Dual-Key Management (Layer 5: Dual-Key Automatic Failover)
 export const getPrimaryApiKey = () => {
   return (
     import.meta.env.VITE_GEMINI_API ||
     import.meta.env.VITE_GEMINI_API_KEY ||
+    import.meta.env.EXPO_PUBLIC_GEMINI_API ||
     ''
   );
 };
@@ -16,6 +17,8 @@ export const getReserveApiKey = () => {
   return (
     import.meta.env.VITE_GEMINI_API_RESERVE ||
     import.meta.env.VITE_GEMINI_API_KEY_RESERVE ||
+    import.meta.env.EXPO_PUBLIC_GEMINI_API_RESERVE ||
+    import.meta.env.EXPO_PUIBLIC_GEMINI_API_RESERVE ||
     ''
   );
 };
