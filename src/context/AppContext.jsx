@@ -468,6 +468,22 @@ export const AppProvider = ({ children }) => {
     setAddUserModalOpen(false);
   };
 
+  // Delete Managed User from Supabase
+  const deleteManagedUser = async (id) => {
+    if (isSupabaseConfigured) {
+      await deleteProfileFromSupabase(id);
+    }
+    setManagedUsers((prev) => prev.filter((u) => u.id !== id));
+    await createAuditLog({
+      action: 'USER_ACCOUNT_DEACTIVATED',
+      actor: 'Super Admin',
+      target: `User ID: ${id}`,
+      status: 'Success',
+      details: 'Account deactivated and deleted from Supabase profiles database.',
+    });
+    addToast('Account Deactivated', 'User account removed from Supabase online database.', 'info');
+  };
+
   // Dynamic Add Knowledge Source to Supabase
   const addKnowledgeSource = async (newSourceData) => {
     const { data: dbResult } = await createKnowledgeSource({
@@ -496,6 +512,15 @@ export const AppProvider = ({ children }) => {
     setSources((prev) => [added, ...prev]);
     setAddSourceModalOpen(false);
     addToast('Source Ingested', `${newSourceData.agencyName} registered in live database.`, 'success');
+  };
+
+  // Remove Knowledge Source from Supabase
+  const removeKnowledgeSource = async (id) => {
+    if (isSupabaseConfigured) {
+      await deleteKnowledgeSource(id);
+    }
+    setSources((prev) => prev.filter((s) => s.id !== id));
+    addToast('Source Deleted', 'Knowledge source deleted from Supabase online database.', 'info');
   };
 
   const openAskAlalay = (opp = null) => {
@@ -558,6 +583,7 @@ export const AppProvider = ({ children }) => {
         addUserModalOpen,
         setAddUserModalOpen,
         addManagedUser,
+        deleteManagedUser,
         tempAdminModalOpen,
         setTempAdminModalOpen,
         createTempAdminAccount,
@@ -582,6 +608,7 @@ export const AppProvider = ({ children }) => {
         selectedEligibilityFilter,
         setSelectedEligibilityFilter,
         addKnowledgeSource,
+        removeKnowledgeSource,
         isScrapingLive,
         scrapingProgress,
         toasts,

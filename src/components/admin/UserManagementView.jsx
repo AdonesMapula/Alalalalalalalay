@@ -22,7 +22,7 @@ import { IOSSheet } from '../common/IOSSheet';
 export const UserManagementView = () => {
   const {
     managedUsers,
-    setManagedUsers,
+    deleteManagedUser,
     setAddUserModalOpen,
     setTempAdminModalOpen,
     addToast,
@@ -41,10 +41,9 @@ export const UserManagementView = () => {
     );
   });
 
-  const handleDeleteUser = (id) => {
-    setManagedUsers((prev) => prev.filter((u) => u.id !== id));
+  const handleDeleteUser = async (id) => {
+    await deleteManagedUser(id);
     setActiveMenuUserId(null);
-    addToast('User Removed', 'User account deactivated.', 'info');
   };
 
   return (

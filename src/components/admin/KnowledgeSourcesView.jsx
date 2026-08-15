@@ -24,68 +24,27 @@ export const KnowledgeSourcesView = () => {
   const [selectedFilter, setSelectedFilter] = useState('All Sources');
   const [filterText, setFilterText] = useState('');
 
-  // Initial table data exactly matching the reference image
-  const defaultAgencies = [
-    {
-      id: 'doh',
-      name: 'Department of Health',
-      url: 'doh.gov.ph',
-      category: 'Health',
-      categoryBadge: 'bg-indigo-50 text-indigo-700',
-      lastScraped: '2023-10-27 08:30',
-      status: 'Active',
-      statusType: 'active',
-      iconType: 'building',
-    },
-    {
-      id: 'bir',
-      name: 'Bureau of Internal Revenue',
-      url: 'bir.gov.ph',
-      category: 'Finance',
-      categoryBadge: 'bg-amber-50 text-amber-800',
-      lastScraped: '2023-10-27 09:15',
-      status: 'Active',
-      statusType: 'active',
-      iconType: 'building',
-    },
-    {
-      id: 'deped',
-      name: 'Department of Education',
-      url: 'deped.gov.ph',
-      category: 'Education',
-      categoryBadge: 'bg-indigo-50 text-indigo-700',
-      lastScraped: 'Failed: 2023-10-26 14:20',
-      status: 'Sync Error',
-      statusType: 'error',
-      iconType: 'alert',
-    },
-    {
-      id: 'dswd',
-      name: 'Department of Social Welfare and Development',
-      url: 'dswd.gov.ph',
-      category: 'Social',
-      categoryBadge: 'bg-slate-100 text-slate-700',
-      lastScraped: '--',
-      status: 'Inactive',
-      statusType: 'inactive',
-      iconType: 'building',
-    },
-  ];
-
   // Dynamic sources from Supabase
-  const dynamicList = (sources && sources.length > 0)
-    ? sources.map((s) => ({
-        id: s.id,
-        name: s.agency_name || s.agencyName || 'Government Agency',
-        url: (s.official_url || s.officialUrl || '').replace(/^https?:\/\//, ''),
-        category: s.category || 'General',
-        categoryBadge: s.category === 'Finance' ? 'bg-amber-50 text-amber-800' : 'bg-indigo-50 text-indigo-700',
-        lastScraped: s.last_scraped_at ? new Date(s.last_scraped_at).toISOString().replace('T', ' ').slice(0, 16) : s.lastScrapedAt || '2026-08-15 09:00',
-        status: s.status || 'Active',
-        statusType: (s.status || '').toLowerCase().includes('error') ? 'error' : (s.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active',
-        iconType: (s.status || '').toLowerCase().includes('error') ? 'alert' : 'building',
-      }))
-    : defaultAgencies;
+  const dynamicList = sources.map((s) => ({
+    id: s.id,
+    name: s.agency_name || s.agencyName || 'Government Agency',
+    url: (s.official_url || s.officialUrl || '').replace(/^https?:\/\//, ''),
+    category: s.category || 'General',
+    categoryBadge:
+      s.category === 'Finance'
+        ? 'bg-amber-50 text-amber-800'
+        : 'bg-indigo-50 text-indigo-700',
+    lastScraped: s.last_scraped_at
+      ? new Date(s.last_scraped_at).toISOString().replace('T', ' ').slice(0, 16)
+      : s.lastScrapedAt || 'Just now',
+    status: s.status || 'Active',
+    statusType: (s.status || '').toLowerCase().includes('error')
+      ? 'error'
+      : (s.status || '').toLowerCase() === 'inactive'
+      ? 'inactive'
+      : 'active',
+    iconType: (s.status || '').toLowerCase().includes('error') ? 'alert' : 'building',
+  }));
 
   const filteredList = dynamicList.filter((agency) => {
     const matchesCategory =
