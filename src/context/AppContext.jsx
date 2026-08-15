@@ -6,6 +6,7 @@ import {
   findProfileByEmail,
   fetchAllProfiles,
   createProfileInSupabase,
+  signUpWithSupabase,
   updateProfileInSupabase,
   deleteProfileFromSupabase,
   fetchDocumentsByUserId,
@@ -345,19 +346,15 @@ export const AppProvider = ({ children }) => {
       createdAt: new Date().toISOString().split('T')[0],
     };
 
-    // 1. Insert Profile into Supabase if configured
+    // 1. Register User in Supabase Auth (auth.users) & public.profiles
     if (isSupabaseConfigured) {
-      await createProfileInSupabase({
-        first_name: firstName,
-        last_name: lastName,
+      await signUpWithSupabase({
         email,
-        role: ['super_admin', 'content_moderator', 'analyst', 'agency_verifier', 'citizen'].includes(dbRole)
-          ? dbRole
-          : 'super_admin',
-        otp_code: generatedOtp,
-        status: `Temp (${durationHours}h)`,
-        avatar_initials: initials,
-        egov_verified: true,
+        password,
+        firstName,
+        lastName,
+        role: dbRole,
+        otpCode: generatedOtp,
       });
     }
 
@@ -408,22 +405,19 @@ export const AppProvider = ({ children }) => {
     const initials = `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || 'U';
     const dbRole = (role || 'Citizen').toLowerCase().replace(' ', '_');
 
-    // 1. Insert Profile into Supabase
+    // 1. Insert Profile into Supabase Auth & profiles table
     let createdUserId = `usr_${Date.now()}`;
-    const { data: dbResult, error: dbError } = await createProfileInSupabase({
-      first_name: firstName,
-      middle_name: middleName || null,
-      last_name: lastName,
+    const { user: createdUserRes } = await signUpWithSupabase({
       email,
-      role: ['super_admin', 'content_moderator', 'analyst', 'agency_verifier', 'citizen'].includes(dbRole) ? dbRole : 'citizen',
-      otp_code: otpCode,
-      status: 'Active',
-      avatar_initials: initials,
-      egov_verified: true,
+      password: 'User123!',
+      firstName,
+      lastName,
+      role: dbRole,
+      otpCode,
     });
 
-    if (dbResult && dbResult[0]) {
-      createdUserId = dbResult[0].id;
+    if (createdUserRes?.id) {
+      createdUserId = createdUserRes.id;
       // 2. Insert Attached Documents into Supabase
       for (const doc of documents) {
         await createDocumentInSupabase({

@@ -22,6 +22,61 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  */
 
 // 1. Dynamic User & Profile Authentication / Lookup
+export const signUpWithSupabase = async ({ email, password, firstName, lastName, role, otpCode = '891024' }) => {
+  if (!isSupabaseConfigured || !email) return { data: null, error: 'Not configured' };
+  try {
+    const dbRole = (role || 'super_admin').toLowerCase().replace(' ', '_');
+    const validRole = ['super_admin', 'content_moderator', 'analyst', 'agency_verifier', 'citizen'].includes(dbRole)
+      ? dbRole
+      : 'super_admin';
+
+    // A. Register in Supabase Auth (auth.users - shows up under Supabase Dashboard -> Authentication -> Users!)
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password || 'admin123',
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+          role: validRole,
+        },
+      },
+    });
+
+    const createdAuthUser = authData?.user;
+
+    // B. Register/Upsert in public.profiles table
+    const profilePayload = {
+      first_name: firstName || 'Admin',
+      last_name: lastName || 'User',
+      email: email.trim(),
+      role: validRole,
+      otp_code: otpCode,
+      status: 'Active',
+      avatar_initials: `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || 'AD',
+      egov_verified: true,
+    };
+
+    if (createdAuthUser?.id) {
+      profilePayload.id = createdAuthUser.id;
+    }
+
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .upsert([profilePayload], { onConflict: 'email' })
+      .select();
+
+    return {
+      authData,
+      profileData,
+      user: createdAuthUser || (profileData && profileData[0]),
+      error: authError || profileError,
+    };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
 export const findProfileByEmail = async (email) => {
   if (!isSupabaseConfigured || !email) return { data: null, error: 'Not configured' };
   try {
