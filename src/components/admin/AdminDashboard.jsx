@@ -116,11 +116,15 @@ export const AdminDashboard = () => {
 
           <button
             type="button"
-            onClick={() => setViewMode('user')}
-            className="w-full flex items-center gap-2.5 px-2 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 cursor-pointer"
+            onClick={() => {
+              logout();
+              setViewMode('user');
+              window.history.pushState({}, '', '/');
+            }}
+            className="w-full flex items-center gap-2.5 px-2 py-2 text-xs font-bold text-slate-500 hover:text-rose-600 cursor-pointer transition-colors"
           >
             <LogOut className="w-4 h-4 text-slate-400" />
-            <span>Switch to Citizen View</span>
+            <span>Sign Out & Return Home</span>
           </button>
         </div>
       </aside>

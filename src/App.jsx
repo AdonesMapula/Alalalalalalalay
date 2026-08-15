@@ -37,20 +37,31 @@ const MainAppContent = () => {
   // Auth Navigation Sub-States: 'landing' | 'login' | 'verify'
   const [authView, setAuthView] = useState('landing');
 
-  // Check URL hash / parameter on mount (#admin or ?admin=true)
+  // Check URL pathname or hash on mount and popstate (e.g. /admin, /admin/, localhost/admin, #admin)
   useEffect(() => {
-    if (window.location.hash === '#admin' || window.location.search.includes('admin=true')) {
-      setIsAuthenticated(true);
-      setViewMode('admin');
-    }
-  }, []);
+    const checkAdminRoute = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
 
-  const openAdminPortal = () => {
-    setIsAuthenticated(true);
-    setViewMode('admin');
-  };
+      if (
+        path === '/admin' ||
+        path === '/admin/' ||
+        path.startsWith('/admin') ||
+        hash === '#admin' ||
+        search.includes('admin=true')
+      ) {
+        setIsAuthenticated(true);
+        setViewMode('admin');
+      }
+    };
 
-  // Super Admin Portal (Exact layout matching the Admin Reference Design)
+    checkAdminRoute();
+    window.addEventListener('popstate', checkAdminRoute);
+    return () => window.removeEventListener('popstate', checkAdminRoute);
+  }, [setIsAuthenticated, setViewMode]);
+
+  // Super Admin Portal (Accessed via localhost/admin or /admin URL)
   if (viewMode === 'admin') {
     return (
       <div className="min-h-screen bg-[#F4F5FB] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white">
@@ -82,7 +93,6 @@ const MainAppContent = () => {
             onContinueToVerify={() => setAuthView('verify')}
             onSignUp={() => setAuthView('verify')}
             onCancel={() => setAuthView('landing')}
-            onOpenAdmin={openAdminPortal}
           />
           <ToastContainer />
         </main>
@@ -99,21 +109,20 @@ const MainAppContent = () => {
       );
     }
 
-    // Default: Landing Page (Image 2)
+    // Default: Landing Page
     return (
       <main className="min-h-screen bg-[#FAFBFF]">
         <SimulationBanner />
         <LandingPage
           onGetStarted={() => setAuthView('login')}
           onLogin={() => setAuthView('login')}
-          onOpenAdmin={openAdminPortal}
         />
         <ToastContainer />
       </main>
     );
   }
 
-  // Authenticated Citizen Dashboard (Image 3 & Image 5)
+  // Authenticated Citizen Dashboard
   return (
     <div className="min-h-screen bg-[#f8fafd] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white">
       {/* Simulation Notice Banner */}
@@ -121,12 +130,12 @@ const MainAppContent = () => {
 
       {/* Main Container Layout */}
       <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
-        {/* Left Desktop Sidebar matching Image 3 & 5 */}
+        {/* Left Desktop Sidebar */}
         <Sidebar />
 
         {/* Main Content Workspace */}
         <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafd]">
-          {/* Header Greeting Bar matching Image 3 */}
+          {/* Header Greeting Bar */}
           <Header />
 
           {/* Dynamic Tab Router */}

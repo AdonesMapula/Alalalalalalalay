@@ -30,15 +30,6 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
             <a href="#features" className="hover:text-[#093a96] transition-colors">Features</a>
             <a href="#how-it-works" className="hover:text-[#093a96] transition-colors">How it Works</a>
             <a href="#trust-security" className="hover:text-[#093a96] transition-colors">Trust & Security</a>
-            {onOpenAdmin && (
-              <button
-                type="button"
-                onClick={onOpenAdmin}
-                className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-[#093a96] hover:bg-blue-50 border border-slate-200 cursor-pointer"
-              >
-                Admin Portal
-              </button>
-            )}
           </nav>
 
           {/* Right Actions */}

@@ -26,33 +26,7 @@ export const Header = () => {
 
       {/* Right Controls */}
       <div className="flex items-center gap-3">
-        {/* Citizen vs Super Admin Switcher */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-full border border-slate-200 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => setViewMode('user')}
-            className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
-              viewMode === 'user'
-                ? 'bg-white text-[#093a96] shadow-xs font-bold'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Citizen
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('admin')}
-            className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
-              viewMode === 'admin'
-                ? 'bg-slate-900 text-white shadow-xs font-bold'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Admin
-          </button>
-        </div>
-
-        {/* Notification Bell in circle container matching Image 3 */}
+        {/* Notification Bell in circle container */}
         <button
           type="button"
           onClick={() => setActiveTab('notifications')}
