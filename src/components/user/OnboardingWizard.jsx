@@ -30,13 +30,13 @@ export const OnboardingWizard = ({ onCancel }) => {
   // 3: Document Retrieval & Synchronizing Super Admin Documents
   const [step, setStep] = useState(1);
 
-  // Form State initialized and auto-filled from user saved by admin
-  const [firstName, setFirstName] = useState(user.firstName || 'Adones');
-  const [lastName, setLastName] = useState(user.lastName || 'Santos');
-  const [middleName, setMiddleName] = useState(user.middleName || 'Mendoza');
-  const [email, setEmail] = useState(user.email || 'adones.santos@egov.ph');
-  const [mobileNumber, setMobileNumber] = useState(user.phone || '+63 917 842 1099');
-  const [currentAddress, setCurrentAddress] = useState(user.address || 'Unit 402, Katipunan Ave, Quezon City, Metro Manila');
+  // Form State initialized dynamically from user details saved by the admin (NO hardcoded fallback)
+  const [firstName, setFirstName] = useState(user?.firstName || user?.first_name || '');
+  const [lastName, setLastName] = useState(user?.lastName || user?.last_name || '');
+  const [middleName, setMiddleName] = useState(user?.middleName || user?.middle_name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [mobileNumber, setMobileNumber] = useState(user?.phone || '');
+  const [currentAddress, setCurrentAddress] = useState(user?.address || '');
 
   // Step 2 Permissions State
   const [biometricEnabled, setBiometricEnabled] = useState(true);
@@ -49,12 +49,12 @@ export const OnboardingWizard = ({ onCancel }) => {
   // Auto-fill state if user object updates
   useEffect(() => {
     if (user) {
-      if (user.firstName) setFirstName(user.firstName);
-      if (user.lastName) setLastName(user.lastName);
-      if (user.middleName) setMiddleName(user.middleName);
-      if (user.email) setEmail(user.email);
-      if (user.phone) setMobileNumber(user.phone);
-      if (user.address) setCurrentAddress(user.address);
+      setFirstName(user.firstName || user.first_name || '');
+      setLastName(user.lastName || user.last_name || '');
+      setMiddleName(user.middleName || user.middle_name || '');
+      setEmail(user.email || '');
+      setMobileNumber(user.phone || '');
+      setCurrentAddress(user.address || '');
     }
   }, [user]);
 
@@ -78,13 +78,8 @@ export const OnboardingWizard = ({ onCancel }) => {
     }
   }, [step]);
 
-  // Prepare list of documents saved by Super Admin for this user
-  const adminSavedDocs = (user?.documents && user.documents.length > 0)
-    ? user.documents
-    : [
-        { name: 'PhilSys National ID.pdf', type: 'Philippine National ID', size: '1.4 MB', status: 'Valid' },
-        { name: 'PhilHealth Member Data Record.pdf', type: 'PhilHealth MDR', size: '980 KB', status: 'Valid' },
-      ];
+  // Retrieve ONLY the documents saved by Super Admin for this user (NO hardcoded fallback)
+  const adminSavedDocs = (user?.documents && user.documents.length > 0) ? user.documents : [];
 
   const handleStep1Submit = (e) => {
     e.preventDefault();
@@ -178,6 +173,7 @@ export const OnboardingWizard = ({ onCancel }) => {
                     required
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="e.g. Maria"
                     className="w-full bg-[#f4f5f8] text-slate-800 text-sm font-medium rounded-xl px-3.5 py-2.5 outline-none border border-transparent focus:border-[#093a96] focus:bg-white transition-all"
                   />
                 </div>
@@ -191,6 +187,7 @@ export const OnboardingWizard = ({ onCancel }) => {
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
+                    placeholder="e.g. Santos"
                     className="w-full bg-[#f4f5f8] text-slate-800 text-sm font-medium rounded-xl px-3.5 py-2.5 outline-none border border-transparent focus:border-[#093a96] focus:bg-white transition-all"
                   />
                 </div>
@@ -198,12 +195,13 @@ export const OnboardingWizard = ({ onCancel }) => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Middle Name (Optional)
+                  Middle Name
                 </label>
                 <input
                   type="text"
                   value={middleName}
                   onChange={(e) => setMiddleName(e.target.value)}
+                  placeholder="e.g. Mendoza"
                   className="w-full bg-[#f4f5f8] text-slate-800 text-sm font-medium rounded-xl px-3.5 py-2.5 outline-none border border-transparent focus:border-[#093a96] focus:bg-white transition-all"
                 />
               </div>
@@ -222,6 +220,7 @@ export const OnboardingWizard = ({ onCancel }) => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@domain.com"
                     className="w-full bg-white text-slate-800 text-sm font-medium rounded-xl pl-10 pr-3.5 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:ring-1 focus:ring-[#093a96] transition-all"
                   />
                 </div>
@@ -230,15 +229,15 @@ export const OnboardingWizard = ({ onCancel }) => {
               {/* Mobile */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Mobile Number *
+                  Mobile Number
                 </label>
                 <div className="relative flex items-center">
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3.5" />
                   <input
                     type="tel"
-                    required
                     value={mobileNumber}
                     onChange={(e) => setMobileNumber(e.target.value)}
+                    placeholder="+63 917 000 0000"
                     className="w-full bg-white text-slate-800 text-sm font-medium rounded-xl pl-10 pr-3.5 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:ring-1 focus:ring-[#093a96] transition-all"
                   />
                 </div>
@@ -247,15 +246,15 @@ export const OnboardingWizard = ({ onCancel }) => {
               {/* Address */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Current Address *
+                  Current Address
                 </label>
                 <div className="relative flex items-start">
                   <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                   <textarea
                     rows={2}
-                    required
                     value={currentAddress}
                     onChange={(e) => setCurrentAddress(e.target.value)}
+                    placeholder="Barangay, City, Province"
                     className="w-full bg-white text-slate-800 text-xs sm:text-sm font-medium rounded-xl pl-10 pr-3.5 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:ring-1 focus:ring-[#093a96] resize-none transition-all"
                   />
                 </div>
@@ -378,12 +377,12 @@ export const OnboardingWizard = ({ onCancel }) => {
 
             <div className="space-y-1">
               <h2 className="text-2xl font-extrabold text-[#0f172a] tracking-tight">
-                {syncComplete ? 'Documents Synchronized!' : 'Fetching eGov Documents...'}
+                {syncComplete ? 'Documents Synchronized!' : 'Fetching Documents from Super Admin...'}
               </h2>
               <p className="text-xs text-slate-500">
                 {syncComplete
-                  ? 'All verified credentials and documents from the Super Admin are ready.'
-                  : 'Retrieving official government clearances and cards from the vault...'}
+                  ? `Retrieved ${adminSavedDocs.length} verified documents from the Super Admin vault.`
+                  : 'Retrieving official government clearances and ID cards from the database...'}
               </p>
             </div>
 
@@ -411,7 +410,7 @@ export const OnboardingWizard = ({ onCancel }) => {
                 }`}>
                   {syncStage >= 3 ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : null}
                 </div>
-                <span>Synchronized {adminSavedDocs.length} documents from Super Admin</span>
+                <span>Fetched {adminSavedDocs.length} documents saved by Super Admin</span>
               </div>
             </div>
 
@@ -427,33 +426,39 @@ export const OnboardingWizard = ({ onCancel }) => {
                 </span>
               </div>
 
-              <div className="space-y-2">
-                {adminSavedDocs.map((doc, idx) => (
-                  <div
-                    key={doc.id || idx}
-                    className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-300"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#093a96] flex items-center justify-center flex-shrink-0">
-                        <FileText className="w-4 h-4" />
+              {adminSavedDocs.length > 0 ? (
+                <div className="space-y-2">
+                  {adminSavedDocs.map((doc, idx) => (
+                    <div
+                      key={doc.id || idx}
+                      className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between gap-3 animate-in slide-in-from-bottom-2 duration-300"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-[#093a96] flex items-center justify-center flex-shrink-0">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-slate-800 truncate block">
+                            {doc.name}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {doc.type || 'Government ID'} • {doc.fileSize || doc.size || '1.4 MB'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <span className="text-xs font-bold text-slate-800 truncate block">
-                          {doc.name}
-                        </span>
-                        <span className="text-[10px] text-slate-400">
-                          {doc.type || 'Government ID'} • {doc.fileSize || doc.size || '1.4 MB'}
-                        </span>
-                      </div>
-                    </div>
 
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1 flex-shrink-0">
-                      <BadgeCheck className="w-3 h-3 text-emerald-600" />
-                      <span>Admin Verified</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1 flex-shrink-0">
+                        <BadgeCheck className="w-3 h-3 text-emerald-600" />
+                        <span>Admin Verified</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-xs text-slate-500 bg-white rounded-2xl border border-slate-200/80">
+                  No documents were uploaded by the admin for this account yet. You can upload verification documents directly inside your vault anytime.
+                </div>
+              )}
             </div>
 
             {/* Complete Setup Action */}

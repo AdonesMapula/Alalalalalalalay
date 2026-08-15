@@ -227,6 +227,30 @@ export const DocumentsView = () => {
         })}
       </div>
 
+      {/* Empty State when no documents */}
+      {filteredDocs.length === 0 && (
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center space-y-4 max-w-md mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#093a96] flex items-center justify-center mx-auto">
+            <FolderLock className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-slate-800">No Documents in Vault</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              There are no documents uploaded yet. Verified documents synchronized from the administrator or added by you will appear here.
+            </p>
+          </div>
+          <IOSButton
+            variant="primary"
+            size="md"
+            icon={Plus}
+            onClick={() => setUploadModalOpen(true)}
+            className="mx-auto"
+          >
+            Upload Document
+          </IOSButton>
+        </div>
+      )}
+
       {/* Document Preview Sheet Modal */}
       {activeDocumentForPreview && (
         <IOSSheet

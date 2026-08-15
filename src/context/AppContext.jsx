@@ -60,10 +60,10 @@ export const AppProvider = ({ children }) => {
   const [guidedTourActive, setGuidedTourActive] = useState(false);
   const [guidedTourStep, setGuidedTourStep] = useState(1);
 
-  // Dynamic Data States (synchronized with Supabase)
+  // Dynamic Data States (synchronized with Supabase - NO hardcoded documents fallback)
   const [documents, setDocuments] = useState(() => {
     const saved = localStorage.getItem('alalay_documents');
-    return saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [opportunities, setOpportunities] = useState(() => {
@@ -99,6 +99,7 @@ export const AppProvider = ({ children }) => {
           {
             id: 'usr_admin_1',
             firstName: 'Super',
+            middleName: '',
             lastName: 'Admin',
             name: 'Super Admin',
             email: 'admin@alalay.gov.ph',
@@ -114,6 +115,7 @@ export const AppProvider = ({ children }) => {
           {
             id: 'usr_mod_2',
             firstName: 'Content',
+            middleName: '',
             lastName: 'Moderator',
             name: 'Content Moderator',
             email: 'moderator@alalay.gov.ph',
@@ -171,16 +173,26 @@ export const AppProvider = ({ children }) => {
         const formatted = dbProfiles.map((p) => ({
           id: p.id,
           firstName: p.first_name,
-          middleName: p.middle_name,
+          middleName: p.middle_name || '',
           lastName: p.last_name,
-          name: p.full_name || `${p.first_name} ${p.last_name}`,
+          name: p.full_name || `${p.first_name} ${p.middle_name ? p.middle_name + ' ' : ''}${p.last_name}`.trim(),
           email: p.email,
           role: p.role === 'super_admin' ? 'System Admin' : p.role === 'content_moderator' ? 'Content Moderator' : p.role === 'analyst' ? 'Analyst' : 'Citizen',
           status: p.status || 'Active',
           avatarInitials: p.avatar_initials || `${p.first_name?.charAt(0) || ''}${p.last_name?.charAt(0) || ''}`.toUpperCase(),
           avatarBg: p.role === 'super_admin' ? 'bg-indigo-600' : p.role === 'content_moderator' ? 'bg-amber-600' : 'bg-blue-600',
           otpCode: p.otp_code || '891024',
-          documents: p.documents || [],
+          documents: p.documents?.map((d, idx) => ({
+            id: d.id || `doc_supa_${idx}`,
+            name: d.name,
+            type: d.type || 'Identity Card',
+            category: d.category || 'Government ID',
+            size: d.file_size || '1.4 MB',
+            fileSize: d.file_size || '1.4 MB',
+            fileType: d.file_type || 'PDF',
+            status: d.status || 'Valid',
+            verifiedBadge: 'Super Admin Verified ✓',
+          })) || [],
           createdAt: p.created_at?.split('T')[0] || '2026-08-15',
         }));
         setManagedUsers(formatted);
@@ -224,33 +236,26 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('alalay_onboarding_done', 'true');
     localStorage.setItem('alalay_auth', 'true');
 
-    // Merge any synced admin documents into user's document vault
-    if (syncedDocs && syncedDocs.length > 0) {
-      setDocuments((prev) => {
-        const existingNames = new Set(prev.map((d) => d.name?.toLowerCase()));
-        const uniqueNew = syncedDocs
-          .filter((d) => !existingNames.has(d.name?.toLowerCase()))
-          .map((d, i) => ({
-            id: d.id || `doc_sync_${Date.now()}_${i}`,
-            name: d.name,
-            type: d.type || 'Identity Card',
-            category: d.category || 'Government ID',
-            status: d.status || 'Valid',
-            fileSize: d.fileSize || d.size || '1.4 MB',
-            fileType: d.fileType || 'PDF',
-            verifiedBadge: 'Super Admin Verified ✓',
-            uploadedAt: 'Synced from eGov Vault',
-            thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
-          }));
-        const updated = [...uniqueNew, ...prev];
-        localStorage.setItem('alalay_documents', JSON.stringify(updated));
-        return updated;
-      });
-    }
+    // Set ONLY the fetched documents belonging to this user (NO hardcoded mock documents)
+    const formattedDocs = (syncedDocs || []).map((d, i) => ({
+      id: d.id || `doc_sync_${Date.now()}_${i}`,
+      name: d.name,
+      type: d.type || 'Identity Card',
+      category: d.category || 'Government ID',
+      status: d.status || 'Valid',
+      fileSize: d.fileSize || d.size || d.file_size || '1.4 MB',
+      fileType: d.fileType || d.file_type || 'PDF',
+      verifiedBadge: 'Super Admin Verified ✓',
+      uploadedAt: 'Synced from Super Admin Vault',
+      thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    }));
+
+    setDocuments(formattedDocs);
+    localStorage.setItem('alalay_documents', JSON.stringify(formattedDocs));
 
     addToast(
       'Setup Complete! 🎉',
-      'Welcome to ALALAY. Your verified eGov credentials and documents are active.',
+      `Welcome to ALALAY. ${formattedDocs.length} verified documents synchronized to your vault.`,
       'success',
       6000
     );
@@ -384,8 +389,8 @@ export const AppProvider = ({ children }) => {
           id: dbProfile.id,
           firstName: dbProfile.first_name,
           lastName: dbProfile.last_name,
-          middleName: dbProfile.middle_name,
-          name: dbProfile.full_name || `${dbProfile.first_name} ${dbProfile.last_name}`,
+          middleName: dbProfile.middle_name || '',
+          name: dbProfile.full_name || `${dbProfile.first_name} ${dbProfile.middle_name ? dbProfile.middle_name + ' ' : ''}${dbProfile.last_name}`.trim(),
           email: dbProfile.email,
           phone: dbProfile.phone || '+63 917 842 1099',
           address: dbProfile.address || 'Metro Manila, Philippines',
@@ -411,18 +416,31 @@ export const AppProvider = ({ children }) => {
       const userKey = matchedProfile?.id || cleanEmail;
       const isFirstTime = !localStorage.getItem(`alalay_onboarding_done_${userKey}`);
 
+      const userDocs = (matchedProfile?.documents || []).map((d, idx) => ({
+        id: d.id || `doc_${Date.now()}_${idx}`,
+        name: d.name,
+        type: d.type || 'Identity Card',
+        category: d.category || 'Government ID',
+        size: d.size || d.fileSize || d.file_size || '1.4 MB',
+        fileSize: d.size || d.fileSize || d.file_size || '1.4 MB',
+        fileType: d.fileType || d.file_type || 'PDF',
+        status: d.status || 'Valid',
+        verifiedBadge: 'Super Admin Verified ✓',
+        uploadedAt: 'Synced from Super Admin Vault',
+      }));
+
       const userToLogin = {
         id: matchedProfile?.id || `usr_${Date.now()}`,
         firstName: matchedProfile?.firstName || matchedProfile?.first_name || 'Adones',
         middleName: matchedProfile?.middleName || matchedProfile?.middle_name || '',
         lastName: matchedProfile?.lastName || matchedProfile?.last_name || 'Santos',
-        name: matchedProfile?.name || `${matchedProfile?.firstName || 'Adones'} ${matchedProfile?.lastName || 'Santos'}`.trim(),
+        name: matchedProfile?.name || `${matchedProfile?.firstName || 'Adones'} ${matchedProfile?.middleName ? matchedProfile.middleName + ' ' : ''}${matchedProfile?.lastName || 'Santos'}`.trim(),
         email: cleanEmail,
         phone: matchedProfile?.phone || '+63 917 842 1099',
         address: matchedProfile?.address || 'Unit 402, Katipunan Ave, Quezon City, Metro Manila',
         role: matchedProfile?.role || 'Citizen',
         otpCode: savedOtp,
-        documents: matchedProfile?.documents || [],
+        documents: userDocs,
         isVerified: true,
         onboardingCompleted: !isFirstTime,
       };
@@ -433,6 +451,12 @@ export const AppProvider = ({ children }) => {
       setActiveTab('home');
       setOnboardingCompleted(!isFirstTime);
       localStorage.setItem('alalay_auth', 'true');
+
+      // If returning user, set their synced documents right away
+      if (!isFirstTime) {
+        setDocuments(userDocs);
+        localStorage.setItem('alalay_documents', JSON.stringify(userDocs));
+      }
 
       if (isFirstTime) {
         addToast(
@@ -548,7 +572,7 @@ export const AppProvider = ({ children }) => {
   };
 
   // Dynamic Add Managed User to Supabase
-  const addManagedUser = async ({ firstName, middleName, lastName, email, role, otpCode, documents = [] }) => {
+  const addManagedUser = async ({ firstName, middleName = '', lastName, email, role, otpCode, documents = [] }) => {
     const initials = `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || 'U';
     const dbRole = (role || 'Citizen').toLowerCase().replace(' ', '_');
 
@@ -558,6 +582,7 @@ export const AppProvider = ({ children }) => {
       email,
       password: 'User123!',
       firstName,
+      middleName: middleName || '',
       lastName,
       role: dbRole,
       otpCode,
@@ -571,17 +596,30 @@ export const AppProvider = ({ children }) => {
           user_id: createdUserId,
           name: doc.name,
           type: doc.type,
-          file_size: doc.size || '1.2 MB',
+          file_size: doc.size || doc.fileSize || '1.2 MB',
           status: 'Valid',
         });
       }
     }
 
+    const formattedDocs = documents.map((d, i) => ({
+      id: d.id || `doc_admin_${Date.now()}_${i}`,
+      name: d.name,
+      type: d.type || 'Identity Card',
+      category: d.category || 'Government ID',
+      size: d.size || d.fileSize || '1.4 MB',
+      fileSize: d.size || d.fileSize || '1.4 MB',
+      fileType: 'PDF',
+      status: 'Valid',
+      verifiedBadge: 'Super Admin Verified ✓',
+      uploadedAt: 'Uploaded by Super Admin',
+    }));
+
     // 3. Update React State
     const newUser = {
       id: createdUserId,
       firstName,
-      middleName,
+      middleName: middleName || '',
       lastName,
       name: `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim(),
       email,
@@ -590,7 +628,7 @@ export const AppProvider = ({ children }) => {
       avatarInitials: initials,
       avatarBg: dbRole === 'super_admin' ? 'bg-indigo-600' : 'bg-blue-600',
       otpCode: otpCode || '891024',
-      documents,
+      documents: formattedDocs,
       createdAt: new Date().toISOString().split('T')[0],
     };
 

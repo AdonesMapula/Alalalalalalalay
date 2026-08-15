@@ -22,7 +22,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
  */
 
 // 1. Dynamic User & Profile Authentication / Lookup
-export const signUpWithSupabase = async ({ email, password, firstName, lastName, role, otpCode = '891024' }) => {
+export const signUpWithSupabase = async ({ email, password, firstName, middleName = '', lastName, role, otpCode = '891024' }) => {
   if (!isSupabaseConfigured || !email) return { data: null, error: 'Not configured' };
   try {
     const dbRole = (role || 'super_admin').toLowerCase().replace(' ', '_');
@@ -37,6 +37,7 @@ export const signUpWithSupabase = async ({ email, password, firstName, lastName,
       options: {
         data: {
           first_name: firstName,
+          middle_name: middleName || '',
           last_name: lastName,
           role: validRole,
         },
@@ -48,6 +49,7 @@ export const signUpWithSupabase = async ({ email, password, firstName, lastName,
     // B. Register/Upsert in public.profiles table
     const profilePayload = {
       first_name: firstName || 'Admin',
+      middle_name: middleName || null,
       last_name: lastName || 'User',
       email: email.trim(),
       role: validRole,
