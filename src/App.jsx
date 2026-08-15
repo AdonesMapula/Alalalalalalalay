@@ -28,6 +28,7 @@ const MainAppContent = () => {
   const {
     isAuthenticated,
     setIsAuthenticated,
+    onboardingCompleted,
     viewMode,
     setViewMode,
     activeTab,
@@ -57,6 +58,17 @@ const MainAppContent = () => {
         <AdminDashboard />
         <ToastContainer />
       </div>
+    );
+  }
+
+  // If user is authenticated for the first time and hasn't completed onboarding:
+  if (isAuthenticated && !onboardingCompleted && viewMode === 'user') {
+    return (
+      <main className="min-h-screen bg-white">
+        <SimulationBanner />
+        <OnboardingWizard onCancel={() => { setIsAuthenticated(false); setAuthView('login'); }} />
+        <ToastContainer />
+      </main>
     );
   }
 

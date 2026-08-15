@@ -208,6 +208,54 @@ export const AppProvider = ({ children }) => {
     loadDynamicSupabaseData();
   }, []);
 
+  // Complete Onboarding Wizard & Sync Admin Documents to Document Locker
+  const completeOnboardingWizard = (syncedDocs = []) => {
+    setOnboardingCompleted(true);
+    setIsAuthenticated(true);
+    setViewMode('user');
+    setActiveTab('home');
+
+    if (user?.id) {
+      localStorage.setItem(`alalay_onboarding_done_${user.id}`, 'true');
+    }
+    if (user?.email) {
+      localStorage.setItem(`alalay_onboarding_done_${user.email}`, 'true');
+    }
+    localStorage.setItem('alalay_onboarding_done', 'true');
+    localStorage.setItem('alalay_auth', 'true');
+
+    // Merge any synced admin documents into user's document vault
+    if (syncedDocs && syncedDocs.length > 0) {
+      setDocuments((prev) => {
+        const existingNames = new Set(prev.map((d) => d.name?.toLowerCase()));
+        const uniqueNew = syncedDocs
+          .filter((d) => !existingNames.has(d.name?.toLowerCase()))
+          .map((d, i) => ({
+            id: d.id || `doc_sync_${Date.now()}_${i}`,
+            name: d.name,
+            type: d.type || 'Identity Card',
+            category: d.category || 'Government ID',
+            status: d.status || 'Valid',
+            fileSize: d.fileSize || d.size || '1.4 MB',
+            fileType: d.fileType || 'PDF',
+            verifiedBadge: 'Super Admin Verified ✓',
+            uploadedAt: 'Synced from eGov Vault',
+            thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+          }));
+        const updated = [...uniqueNew, ...prev];
+        localStorage.setItem('alalay_documents', JSON.stringify(updated));
+        return updated;
+      });
+    }
+
+    addToast(
+      'Setup Complete! 🎉',
+      'Welcome to ALALAY. Your verified eGov credentials and documents are active.',
+      'success',
+      6000
+    );
+  };
+
   // Sync Managed Users to LocalStorage
   useEffect(() => {
     localStorage.setItem('alalay_managed_users', JSON.stringify(managedUsers));
@@ -337,9 +385,13 @@ export const AppProvider = ({ children }) => {
           firstName: dbProfile.first_name,
           lastName: dbProfile.last_name,
           middleName: dbProfile.middle_name,
+          name: dbProfile.full_name || `${dbProfile.first_name} ${dbProfile.last_name}`,
           email: dbProfile.email,
+          phone: dbProfile.phone || '+63 917 842 1099',
+          address: dbProfile.address || 'Metro Manila, Philippines',
           role: dbProfile.role,
           otpCode: dbProfile.otp_code || '891024',
+          documents: dbProfile.documents || [],
           isVerified: dbProfile.egov_verified ?? true,
         };
       }
@@ -356,28 +408,47 @@ export const AppProvider = ({ children }) => {
     const savedOtp = (matchedProfile?.otpCode || matchedProfile?.otp_code || '891024').toString().toUpperCase();
 
     if (cleanOtp === savedOtp || cleanOtp === '891024') {
-      const userToLogin = matchedProfile || {
-        id: `usr_${Date.now()}`,
-        firstName: cleanEmail.split('@')[0],
-        lastName: 'Citizen',
+      const userKey = matchedProfile?.id || cleanEmail;
+      const isFirstTime = !localStorage.getItem(`alalay_onboarding_done_${userKey}`);
+
+      const userToLogin = {
+        id: matchedProfile?.id || `usr_${Date.now()}`,
+        firstName: matchedProfile?.firstName || matchedProfile?.first_name || 'Adones',
+        middleName: matchedProfile?.middleName || matchedProfile?.middle_name || '',
+        lastName: matchedProfile?.lastName || matchedProfile?.last_name || 'Santos',
+        name: matchedProfile?.name || `${matchedProfile?.firstName || 'Adones'} ${matchedProfile?.lastName || 'Santos'}`.trim(),
         email: cleanEmail,
-        role: 'Citizen',
+        phone: matchedProfile?.phone || '+63 917 842 1099',
+        address: matchedProfile?.address || 'Unit 402, Katipunan Ave, Quezon City, Metro Manila',
+        role: matchedProfile?.role || 'Citizen',
+        otpCode: savedOtp,
+        documents: matchedProfile?.documents || [],
         isVerified: true,
+        onboardingCompleted: !isFirstTime,
       };
 
       setUser(userToLogin);
       setIsAuthenticated(true);
       setViewMode('user');
       setActiveTab('home');
-      setOnboardingCompleted(true);
+      setOnboardingCompleted(!isFirstTime);
       localStorage.setItem('alalay_auth', 'true');
 
-      addToast(
-        'eGov PH Authenticated ✓',
-        `Welcome back, ${userToLogin.firstName || userToLogin.name || 'Citizen'}!`,
-        'success'
-      );
-      return { success: true, user: userToLogin };
+      if (isFirstTime) {
+        addToast(
+          'eGov PH Verified ✓',
+          `Welcome, ${userToLogin.firstName}! Please complete your 3-step setup.`,
+          'success'
+        );
+      } else {
+        addToast(
+          'Welcome Back ✓',
+          `Logged in as ${userToLogin.firstName || userToLogin.name}!`,
+          'success'
+        );
+      }
+
+      return { success: true, user: userToLogin, isFirstTime };
     } else {
       addToast(
         'Invalid eGov OTP',
@@ -600,13 +671,6 @@ export const AppProvider = ({ children }) => {
 
   const startOnboardingWizard = () => {
     setOnboardingCompleted(false);
-  };
-
-  const completeOnboardingWizard = () => {
-    setOnboardingCompleted(true);
-    setIsAuthenticated(true);
-    localStorage.setItem('alalay_onboarding_done', 'true');
-    localStorage.setItem('alalay_auth', 'true');
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
