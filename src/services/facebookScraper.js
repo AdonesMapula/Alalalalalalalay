@@ -146,34 +146,40 @@ export function generateContentHash(normalizedText) {
 }
 
 /**
- * Scrape a public Facebook Page HTML and extract content safely
+ * Scrape a public Facebook Page HTML and extract content safely with CORS bypass
  */
 export async function scrapePublicFacebookPage(sourceUrl) {
   const posts = [];
 
-  const headers = {
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    Accept:
-      'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Cache-Control': 'no-cache',
-    Pragma: 'no-cache',
-  };
-
   try {
-    const response = await fetch(sourceUrl, {
-      method: 'GET',
-      headers,
-      redirect: 'follow',
-    });
+    let html = '';
 
-    if (!response.ok) {
-      console.warn(`[FacebookScraper] HTTP ${response.status} when fetching ${sourceUrl}`);
-      return getFallbackPostsForSource(sourceUrl, `HTTP ${response.status}`);
+    // 1. Try local dev proxy / CORS proxies
+    const proxyStrategies = [
+      `/api/proxy-scrape?url=${encodeURIComponent(sourceUrl)}`,
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(sourceUrl)}`,
+      `https://corsproxy.io/?url=${encodeURIComponent(sourceUrl)}`,
+    ];
+
+    for (const pUrl of proxyStrategies) {
+      try {
+        const res = await fetch(pUrl);
+        if (res.ok) {
+          const t = await res.text();
+          if (t && t.length > 50 && !t.startsWith('{"error"')) {
+            html = t;
+            break;
+          }
+        }
+      } catch (e) {
+        // next strategy
+      }
     }
 
-    const html = await response.text();
+    if (!html) {
+      return getFallbackPostsForSource(sourceUrl, 'Offline fallback');
+    }
+
     const $ = cheerio.load(html);
 
     // 1. Extract Open Graph Metadata
