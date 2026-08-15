@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logoImg from '../../assets/logos.png';
 import {
   LayoutGrid,
   Database,
@@ -57,9 +58,13 @@ export const AdminDashboard = () => {
         {/* Top Branding matching reference image */}
         <div className="space-y-8">
           <div className="flex items-center gap-3">
-            {/* Shield with Star Emblem in deep blue */}
-            <div className="w-10 h-10 rounded-2xl bg-[#141870] text-white flex items-center justify-center shadow-sm flex-shrink-0">
-              <Shield className="w-5 h-5 fill-white text-[#141870]" />
+            {/* Logo Emblem from assets */}
+            <div className="w-10 h-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center p-1.5 overflow-hidden flex-shrink-0">
+              <img
+                src={logoImg}
+                alt="ALALAY Logo"
+                className="w-full h-full object-contain"
+              />
             </div>
 
             <div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Landmark, ArrowLeft, Shield, Sparkles, Clock, UserCheck, KeyRound, CheckCircle2 } from 'lucide-react';
+import logoImg from '../../assets/logos.png';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { useApp } from '../../context/AppContext';
 
@@ -113,35 +114,14 @@ export const LoginPage = ({ onContinueToVerify, onCancel, onSignUp, onOpenAdmin 
 
       {/* Main Card */}
       <div className="w-full max-w-md bg-white rounded-[32px] border border-slate-200/80 shadow-xl shadow-blue-900/5 p-8 sm:p-10 space-y-6 text-center animate-in zoom-in-95 duration-200 mt-6">
-        {/* Top Logo Emblem */}
+        {/* Top Logo Emblem using logos.png */}
         <div className="flex justify-center">
-          <div className="w-20 h-20 rounded-3xl bg-white border border-slate-200/80 shadow-xs p-3 flex flex-col items-center justify-center">
-            <svg
-              viewBox="0 0 100 100"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-10 h-10"
-            >
-              <path
-                d="M50 24C41 12 25 14 18 24C10 35 12 50 25 64L50 88L75 64C88 50 90 35 82 24C75 14 59 12 50 24Z"
-                stroke="#093a96"
-                strokeWidth="7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="#eef4ff"
-              />
-              <path
-                d="M34 45C38 40 44 40 48 45L50 47L52 45C56 40 62 40 66 45C70 50 69 57 63 64L50 77L37 64C31 57 30 50 34 45Z"
-                fill="#22c55e"
-                opacity="0.9"
-              />
-              <path
-                d="M38 34C44 26 56 26 62 34"
-                stroke="#0ea5e9"
-                strokeWidth="5"
-                strokeLinecap="round"
-              />
-            </svg>
+          <div className="w-20 h-20 rounded-3xl bg-white border border-slate-200/80 shadow-xs p-2.5 flex flex-col items-center justify-center overflow-hidden">
+            <img
+              src={logoImg}
+              alt="ALALAY Logo"
+              className="w-12 h-12 object-contain"
+            />
             <span className="text-[9px] font-black text-[#093a96] tracking-tight mt-0.5">
               ALALAY
             </span>
