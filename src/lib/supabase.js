@@ -214,6 +214,20 @@ export const createKnowledgeSource = async (sourceData) => {
   }
 };
 
+export const updateKnowledgeSource = async (id, updateData) => {
+  if (!isSupabaseConfigured) return { data: null, error: 'Not configured' };
+  try {
+    const { data, error } = await supabase
+      .from('knowledge_sources')
+      .update(updateData)
+      .eq('id', id)
+      .select();
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
 export const deleteKnowledgeSource = async (id) => {
   if (!isSupabaseConfigured) return { data: null, error: 'Not configured' };
   try {

@@ -14,24 +14,30 @@ export const AddSourceModal = () => {
   const [scrapingFrequency, setScrapingFrequency] = useState('Every 12 Hours');
   const [priority, setPriority] = useState('High');
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!agencyName || !officialUrl) return;
+    if (!officialUrl) return;
 
-    addKnowledgeSource({
-      agencyName,
-      agencyType,
-      officialUrl,
-      category,
-      scrapingFrequency,
-      priority,
-      notes,
-    });
+    setIsSubmitting(true);
+    try {
+      await addKnowledgeSource({
+        agencyName,
+        agencyType,
+        officialUrl,
+        category,
+        scrapingFrequency,
+        priority,
+        notes,
+      });
 
-    setAgencyName('');
-    setOfficialUrl('https://');
-    setNotes('');
+      setAgencyName('');
+      setOfficialUrl('https://');
+      setNotes('');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -171,9 +177,10 @@ export const AddSourceModal = () => {
             variant="primary"
             size="md"
             fullWidth
+            loading={isSubmitting}
             icon={Plus}
           >
-            Register & Start Ingestion
+            {isSubmitting ? 'Scraping & Ingesting...' : 'Register & Start Ingestion'}
           </IOSButton>
         </div>
       </form>
