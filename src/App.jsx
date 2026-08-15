@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { SimulationBanner } from './components/common/SimulationBanner';
 import { LandingPage } from './components/layout/LandingPage';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -65,7 +64,6 @@ const MainAppContent = () => {
   if (viewMode === 'admin') {
     return (
       <div className="min-h-screen bg-[#F4F5FB] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white">
-        <SimulationBanner />
         <AdminDashboard />
         <ToastContainer />
       </div>
@@ -76,7 +74,6 @@ const MainAppContent = () => {
   if (isAuthenticated && !onboardingCompleted && viewMode === 'user') {
     return (
       <main className="min-h-screen bg-white">
-        <SimulationBanner />
         <OnboardingWizard onCancel={() => { setIsAuthenticated(false); setAuthView('login'); }} />
         <ToastContainer />
       </main>
@@ -88,7 +85,6 @@ const MainAppContent = () => {
     if (authView === 'login') {
       return (
         <main className="min-h-screen bg-[#F4F5FB]">
-          <SimulationBanner />
           <LoginPage
             onContinueToVerify={() => setAuthView('verify')}
             onSignUp={() => setAuthView('verify')}
@@ -102,7 +98,6 @@ const MainAppContent = () => {
     if (authView === 'verify') {
       return (
         <main className="min-h-screen bg-white">
-          <SimulationBanner />
           <OnboardingWizard onCancel={() => setAuthView('login')} />
           <ToastContainer />
         </main>
@@ -112,7 +107,6 @@ const MainAppContent = () => {
     // Default: Landing Page
     return (
       <main className="min-h-screen bg-[#FAFBFF]">
-        <SimulationBanner />
         <LandingPage
           onGetStarted={() => setAuthView('login')}
           onLogin={() => setAuthView('login')}
@@ -125,9 +119,6 @@ const MainAppContent = () => {
   // Authenticated Citizen Dashboard
   return (
     <div className="min-h-screen bg-[#f8fafd] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white">
-      {/* Simulation Notice Banner */}
-      <SimulationBanner />
-
       {/* Main Container Layout */}
       <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
         {/* Left Desktop Sidebar */}
