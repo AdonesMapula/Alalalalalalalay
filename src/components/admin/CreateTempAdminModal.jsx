@@ -25,12 +25,13 @@ export const CreateTempAdminModal = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState('System Admin');
   const [durationHours, setDurationHours] = useState(24);
   const [otpCode, setOtpCode] = useState(() =>
     Math.floor(100000 + Math.random() * 900000).toString()
   );
-  const [autoLogin, setAutoLogin] = useState(false);
+  const [autoLogin, setAutoLogin] = useState(true);
   const [copied, setCopied] = useState(false);
 
   const handleGenerateOtp = () => {
@@ -46,12 +47,13 @@ export const CreateTempAdminModal = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !email) return;
+    if (!firstName || !lastName || !email || !password) return;
 
     await createTempAdminAccount({
       firstName,
       lastName,
       email,
+      password,
       role,
       durationHours: Number(durationHours),
       otpCode,
@@ -62,9 +64,10 @@ export const CreateTempAdminModal = () => {
     setFirstName('');
     setLastName('');
     setEmail('');
+    setPassword('');
     setRole('System Admin');
     setDurationHours(24);
-    setAutoLogin(false);
+    setAutoLogin(true);
     setTempAdminModalOpen(false);
   };
 
@@ -80,8 +83,8 @@ export const CreateTempAdminModal = () => {
     <IOSSheet
       isOpen={tempAdminModalOpen}
       onClose={() => setTempAdminModalOpen(false)}
-      title="Create Temporary Admin Account"
-      subtitle="Register time-bounded administrator credentials with instant activation & security passcodes"
+      title="Admin Account Sign Up (Online Activation)"
+      subtitle="Input administrator sign up email & password to activate account online immediately"
       maxWidth="max-w-xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6 select-none">
@@ -92,13 +95,13 @@ export const CreateTempAdminModal = () => {
           </div>
           <div className="text-xs space-y-1">
             <h4 className="font-bold text-amber-900 flex items-center gap-1.5">
-              <span>Time-Bounded Security Access</span>
+              <span>Admin Online Sign Up</span>
               <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black uppercase">
-                Temp Admin
+                Active Admin
               </span>
             </h4>
             <p className="text-amber-800 leading-relaxed">
-              Temporary admin accounts grant privileged access for audits, debugging, or temporary moderation. Credentials automatically deactivate upon expiration.
+              Enter email and password credentials to register your administrator account. Once registered, your admin account goes online immediately.
             </p>
           </div>
         </div>
@@ -107,7 +110,7 @@ export const CreateTempAdminModal = () => {
         <div className="space-y-3">
           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
             <Shield className="w-3.5 h-3.5 text-[#093a96]" />
-            <span>1. Admin Account Information</span>
+            <span>1. Admin Credentials & Info</span>
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -143,34 +146,48 @@ export const CreateTempAdminModal = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Email Address *
+                Sign Up Email Address *
               </label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="temp.admin@gov.ph"
+                placeholder="admin@alalay.gov.ph"
                 className="w-full bg-[#f8fafc] text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3.5 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white transition-all"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Admin Privilege Level
+                Account Password *
               </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-[#f8fafc] text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white transition-all cursor-pointer"
-              >
-                <option value="System Admin">System Admin (Full Access)</option>
-                <option value="Super Admin">Super Admin</option>
-                <option value="Content Moderator">Content Moderator</option>
-                <option value="Analyst">Analyst</option>
-                <option value="Agency Verifier">Agency Verifier</option>
-              </select>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-[#f8fafc] text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3.5 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white transition-all"
+              />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Admin Privilege Role
+            </label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full bg-[#f8fafc] text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white transition-all cursor-pointer"
+            >
+              <option value="System Admin">System Admin (Full Access)</option>
+              <option value="Super Admin">Super Admin</option>
+              <option value="Content Moderator">Content Moderator</option>
+              <option value="Analyst">Analyst</option>
+              <option value="Agency Verifier">Agency Verifier</option>
+            </select>
           </div>
         </div>
 
