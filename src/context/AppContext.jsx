@@ -16,11 +16,16 @@ import {
   createKnowledgeSource,
   updateKnowledgeSource,
   deleteKnowledgeSource,
+  deleteOpportunitiesBySourceUrl,
+  deleteOpportunitiesByIds,
   fetchOpportunities,
   createOpportunity,
   saveMultipleOpportunitiesToSupabase,
   fetchAuditLogs,
   createAuditLog,
+  fetchChatArchives,
+  saveChatArchiveToSupabase,
+  deleteChatArchiveFromSupabase,
 } from '../lib/supabase';
 import { runFacebookSyncPipeline } from '../services/facebookScraper';
 import { scrapeAnyWebsite } from '../services/webScraper';
@@ -33,6 +38,7 @@ import {
   AI_DETECTED_QUEUE,
   NOTIFICATIONS,
   AUDIT_LOGS,
+  INITIAL_CHAT_ARCHIVES,
 } from '../lib/mockData';
 
 const AppContext = createContext();
@@ -125,6 +131,21 @@ export const AppProvider = ({ children }) => {
     return saved ? JSON.parse(saved) : AUDIT_LOGS;
   });
 
+  const [chatArchives, setChatArchives] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alalay_chat_archives');
+      return saved ? JSON.parse(saved) : INITIAL_CHAT_ARCHIVES;
+    } catch (e) {
+      return INITIAL_CHAT_ARCHIVES;
+    }
+  });
+
+  const [loadedChatSession, setLoadedChatSession] = useState(null);
+
+  useEffect(() => {
+    localStorage.setItem('alalay_chat_archives', JSON.stringify(chatArchives));
+  }, [chatArchives]);
+
   const [managedUsers, setManagedUsers] = useState(() => {
     const saved = localStorage.getItem('alalay_managed_users');
     return saved
@@ -216,6 +237,10 @@ export const AppProvider = ({ children }) => {
           avatarInitials: p.avatar_initials || `${p.first_name?.charAt(0) || ''}${p.last_name?.charAt(0) || ''}`.toUpperCase(),
           avatarBg: p.role === 'super_admin' ? 'bg-indigo-600' : p.role === 'content_moderator' ? 'bg-amber-600' : 'bg-blue-600',
           otpCode: p.otp_code || '891024',
+          egovVerified: p.egov_verified ?? false,
+          isVerified: p.egov_verified ?? false,
+          onboardingCompleted: p.onboarding_completed ?? false,
+          onboarding_completed: p.onboarding_completed ?? false,
           documents: p.documents?.map((d, idx) => ({
             id: d.id || `doc_supa_${idx}`,
             name: d.name,
@@ -235,32 +260,29 @@ export const AppProvider = ({ children }) => {
       // B. Fetch Dynamic Knowledge Sources & Merge
       const { data: dbSources } = await fetchKnowledgeSources();
       if (dbSources && dbSources.length > 0) {
-        setSources((prev) => {
-          const srcMap = new Map();
-          (prev || []).forEach((s) => srcMap.set(s.id || s.official_url || s.officialUrl, s));
-          dbSources.forEach((s) => srcMap.set(s.id || s.official_url || s.officialUrl, s));
-          const merged = Array.from(srcMap.values());
-          localStorage.setItem('alalay_sources', JSON.stringify(merged));
-          return merged;
+        let deletedKeys = [];
+        try {
+          deletedKeys = JSON.parse(localStorage.getItem('alalay_deleted_sources') || '[]');
+        } catch (e) {}
+
+        const activeDbSources = dbSources.filter((s) => {
+          const sUrl = (s.official_url || s.officialUrl || s.url || s.id || '').toLowerCase();
+          const sName = (s.name || '').toLowerCase();
+          return !deletedKeys.some(
+            (k) => k && (sUrl.includes(String(k).toLowerCase()) || sName.includes(String(k).toLowerCase()))
+          );
         });
+
+        setSources(activeDbSources);
+        localStorage.setItem('alalay_sources', JSON.stringify(activeDbSources));
       }
 
-      // C. Fetch Dynamic Opportunities & Merge (Never delete old discovered opportunities on refresh!)
+      // C. Fetch Dynamic Opportunities directly from Supabase (Single Source of Truth)
       const { data: dbOpps } = await fetchOpportunities();
-      setOpportunities((prev) => {
-        const oppMap = new Map();
-        // Keep existing opportunities
-        (prev || []).forEach((o) => {
-          if (o?.title) oppMap.set(o.title.toLowerCase().trim(), o);
-        });
-        // Merge Supabase opportunities
-        (dbOpps || []).forEach((o) => {
-          if (o?.title) oppMap.set(o.title.toLowerCase().trim(), o);
-        });
-        const merged = Array.from(oppMap.values());
-        localStorage.setItem('alalay_opportunities', JSON.stringify(merged));
-        return merged;
-      });
+      if (dbOpps && Array.isArray(dbOpps)) {
+        setOpportunities(dbOpps);
+        localStorage.setItem('alalay_opportunities', JSON.stringify(dbOpps));
+      }
 
       // D. Fetch Dynamic Audit Logs
       const { data: dbLogs } = await fetchAuditLogs();
@@ -326,15 +348,119 @@ export const AppProvider = ({ children }) => {
     loadUserDocuments();
   }, [user?.id, user?.email]);
 
+  // Synchronize chat archives exclusively for the active signed-in user
+  useEffect(() => {
+    const loadUserChatArchives = async () => {
+      const cleanEmail = (user?.email || '').toLowerCase().trim();
+      const userId = user?.id || '';
+
+      if (!cleanEmail && !userId) {
+        setChatArchives([]);
+        return;
+      }
+
+      // 1. Load cached user archives from per-user localStorage
+      const userKey = `alalay_chat_archives_${cleanEmail || userId}`;
+      try {
+        const cached = localStorage.getItem(userKey);
+        if (cached) {
+          setChatArchives(JSON.parse(cached));
+        } else {
+          setChatArchives([]);
+        }
+      } catch (e) {
+        setChatArchives([]);
+      }
+
+      // 2. Fetch authoritative user chat archives from Supabase
+      if (isSupabaseConfigured) {
+        const { data: dbArchives } = await fetchChatArchives(cleanEmail, userId);
+        if (dbArchives && Array.isArray(dbArchives)) {
+          setChatArchives(dbArchives);
+          localStorage.setItem(userKey, JSON.stringify(dbArchives));
+        }
+      }
+    };
+
+    loadUserChatArchives();
+  }, [user?.id, user?.email]);
+
+  // Update User Profile (Mobile Number, Address, Name) in State and Supabase
+  const updateUserProfile = async (profileUpdates = {}) => {
+    const cleanEmail = (profileUpdates.email || user?.email || '').toLowerCase().trim();
+    const userId = profileUpdates.id || user?.id || '';
+
+    // 1. Update user in state and localStorage
+    setUser((prev) => {
+      const updated = {
+        ...prev,
+        ...profileUpdates,
+        phone: profileUpdates.phone ?? prev?.phone ?? '',
+        address: profileUpdates.address ?? prev?.address ?? '',
+      };
+      localStorage.setItem('alalay_user', JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Update in managedUsers list
+    setManagedUsers((prev) => {
+      const updated = prev.map((u) => {
+        if (
+          (userId && u.id === userId) ||
+          (cleanEmail && u.email?.toLowerCase() === cleanEmail)
+        ) {
+          return {
+            ...u,
+            ...profileUpdates,
+            phone: profileUpdates.phone ?? u.phone,
+            address: profileUpdates.address ?? u.address,
+          };
+        }
+        return u;
+      });
+      localStorage.setItem('alalay_managed_users', JSON.stringify(updated));
+      return updated;
+    });
+
+    // 3. Persist to Supabase public.profiles table
+    if (isSupabaseConfigured) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      const dbPayload = {
+        phone: profileUpdates.phone ?? user?.phone ?? '',
+        address: profileUpdates.address ?? user?.address ?? '',
+        first_name: profileUpdates.firstName || profileUpdates.first_name || user?.firstName || user?.first_name || '',
+        last_name: profileUpdates.lastName || profileUpdates.last_name || user?.lastName || user?.last_name || '',
+        middle_name: profileUpdates.middleName || profileUpdates.middle_name || user?.middleName || user?.middle_name || '',
+        updated_at: new Date().toISOString(),
+      };
+
+      if (profileUpdates.onboardingCompleted !== undefined) {
+        dbPayload.onboarding_completed = profileUpdates.onboardingCompleted;
+      }
+      if (profileUpdates.egovVerified !== undefined) {
+        dbPayload.egov_verified = profileUpdates.egovVerified;
+      }
+
+      if (isUUID) {
+        await updateProfileInSupabase(userId, dbPayload);
+      } else if (cleanEmail) {
+        const { data: p } = await findProfileByEmail(cleanEmail);
+        if (p?.id) {
+          await updateProfileInSupabase(p.id, dbPayload);
+        }
+      }
+    }
+  };
+
   // Complete Onboarding Wizard & Sync Admin Documents to Document Locker
-  const completeOnboardingWizard = (syncedDocs = []) => {
+  const completeOnboardingWizard = async (syncedDocs = [], updatedFields = {}) => {
     setOnboardingCompleted(true);
     setIsAuthenticated(true);
     setViewMode('user');
     setActiveTab('home');
 
-    const cleanEmail = (user?.email || '').toLowerCase().trim();
-    const userId = user?.id || '';
+    const cleanEmail = (updatedFields.email || user?.email || '').toLowerCase().trim();
+    const userId = updatedFields.id || user?.id || '';
 
     if (userId) {
       localStorage.setItem(`alalay_onboarding_done_${userId}`, 'true');
@@ -345,24 +471,65 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('alalay_onboarding_done', 'true');
     localStorage.setItem('alalay_auth', 'true');
 
-    // Update user in state
-    setUser((prev) => ({
-      ...prev,
-      onboardingCompleted: true,
-    }));
+    // Update user in state with latest phone, address, and onboarding status
+    setUser((prev) => {
+      const updated = {
+        ...prev,
+        ...updatedFields,
+        phone: updatedFields.phone ?? prev?.phone ?? '',
+        address: updatedFields.address ?? prev?.address ?? '',
+        onboardingCompleted: true,
+        onboarding_completed: true,
+      };
+      localStorage.setItem('alalay_user', JSON.stringify(updated));
+      return updated;
+    });
 
     // Update in managedUsers
-    setManagedUsers((prev) =>
-      prev.map((u) => {
+    setManagedUsers((prev) => {
+      const updated = prev.map((u) => {
         if (
           (userId && u.id === userId) ||
           (cleanEmail && u.email?.toLowerCase() === cleanEmail)
         ) {
-          return { ...u, onboardingCompleted: true, onboarding_completed: true };
+          return {
+            ...u,
+            ...updatedFields,
+            phone: updatedFields.phone ?? u.phone,
+            address: updatedFields.address ?? u.address,
+            onboardingCompleted: true,
+            onboarding_completed: true,
+          };
         }
         return u;
-      })
-    );
+      });
+      localStorage.setItem('alalay_managed_users', JSON.stringify(updated));
+      return updated;
+    });
+
+    // Persist phone, address, and onboarding status to Supabase profile across all devices
+    if (isSupabaseConfigured) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      const dbPayload = {
+        phone: updatedFields.phone ?? user?.phone ?? '',
+        address: updatedFields.address ?? user?.address ?? '',
+        first_name: updatedFields.firstName || updatedFields.first_name || user?.firstName || user?.first_name || '',
+        last_name: updatedFields.lastName || updatedFields.last_name || user?.lastName || user?.last_name || '',
+        middle_name: updatedFields.middleName || updatedFields.middle_name || user?.middleName || user?.middle_name || '',
+        onboarding_completed: true,
+        egov_verified: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (isUUID) {
+        await updateProfileInSupabase(userId, dbPayload);
+      } else if (cleanEmail) {
+        const { data: p } = await findProfileByEmail(cleanEmail);
+        if (p?.id) {
+          await updateProfileInSupabase(p.id, dbPayload);
+        }
+      }
+    }
 
     // Set ONLY the fetched documents belonging to this user (NO hardcoded mock documents)
     const formattedDocs = (syncedDocs || []).map((d, i) => ({
@@ -511,52 +678,44 @@ export const AppProvider = ({ children }) => {
       return { success: false, message: 'Missing fields' };
     }
 
-    // 1. Check local managedUsers array first
-    let matchedProfile = managedUsers.find(
+    // 1. Always query Supabase first to get fresh, authoritative account state
+    let dbProfile = null;
+    if (isSupabaseConfigured) {
+      const { data } = await findProfileByEmail(cleanEmail);
+      dbProfile = data;
+    }
+
+    // 2. Check local managedUsers array if not found in Supabase
+    let localProfile = managedUsers.find(
       (u) => u.email?.toLowerCase() === cleanEmail.toLowerCase()
     );
 
-    // 2. Check Supabase profiles table
-    if (!matchedProfile && isSupabaseConfigured) {
-      const { data: dbProfile } = await findProfileByEmail(cleanEmail);
-      if (dbProfile) {
-        matchedProfile = {
-          id: dbProfile.id,
-          firstName: dbProfile.first_name,
-          lastName: dbProfile.last_name,
-          middleName: dbProfile.middle_name || '',
-          name: dbProfile.full_name || `${dbProfile.first_name} ${dbProfile.middle_name ? dbProfile.middle_name + ' ' : ''}${dbProfile.last_name}`.trim(),
-          email: dbProfile.email,
-          phone: dbProfile.phone || '+63 917 842 1099',
-          address: dbProfile.address || 'Metro Manila, Philippines',
-          role: dbProfile.role,
-          otpCode: dbProfile.otp_code || '891024',
-          documents: dbProfile.documents || [],
-          isVerified: dbProfile.egov_verified ?? true,
-        };
-      }
-    }
-
-    // 3. Fallback for default demo accounts
+    let matchedProfile = dbProfile || localProfile;
     if (!matchedProfile) {
-      if (cleanEmail.toLowerCase().includes('adones')) {
-        matchedProfile = { ...INITIAL_USER, otpCode: '891024' };
-      }
+      matchedProfile = {
+        firstName: cleanEmail.split('@')[0],
+        lastName: 'Citizen',
+        email: cleanEmail,
+        role: 'Citizen',
+        otp_code: '891024',
+        otpCode: '891024',
+        onboarding_completed: false,
+        onboardingCompleted: false,
+      };
     }
 
-    // 4. Validate OTP saved by admin (or default 891024)
-    const savedOtp = (matchedProfile?.otpCode || matchedProfile?.otp_code || '891024').toString().toUpperCase();
+    // 3. Validate OTP saved by admin (or default 891024)
+    const savedOtp = (
+      matchedProfile?.otp_code ||
+      matchedProfile?.otpCode ||
+      '891024'
+    ).toString().toUpperCase();
 
     if (cleanOtp === savedOtp || cleanOtp === '891024') {
-      const lowerEmail = cleanEmail.toLowerCase();
-      const userKey = matchedProfile?.id || lowerEmail;
-      
+      // 4. Check onboarding directly from Supabase / profile record (Single Source of Truth)
       const hasDoneOnboarding =
-        localStorage.getItem('alalay_onboarding_done') === 'true' ||
-        localStorage.getItem(`alalay_onboarding_done_${lowerEmail}`) === 'true' ||
-        localStorage.getItem(`alalay_onboarding_done_${userKey}`) === 'true' ||
-        matchedProfile?.onboardingCompleted === true ||
-        matchedProfile?.onboarding_completed === true;
+        dbProfile ? dbProfile.onboarding_completed === true :
+        Boolean(matchedProfile?.onboarding_completed || matchedProfile?.onboardingCompleted);
 
       const isFirstTime = !hasDoneOnboarding;
 
@@ -575,10 +734,13 @@ export const AppProvider = ({ children }) => {
 
       const userToLogin = {
         id: matchedProfile?.id || `usr_${Date.now()}`,
-        firstName: matchedProfile?.firstName || matchedProfile?.first_name || 'Adones',
-        middleName: matchedProfile?.middleName || matchedProfile?.middle_name || '',
-        lastName: matchedProfile?.lastName || matchedProfile?.last_name || 'Santos',
-        name: matchedProfile?.name || `${matchedProfile?.firstName || 'Adones'} ${matchedProfile?.middleName ? matchedProfile.middleName + ' ' : ''}${matchedProfile?.lastName || 'Santos'}`.trim(),
+        firstName: matchedProfile?.first_name || matchedProfile?.firstName || 'Adones',
+        middleName: matchedProfile?.middle_name || matchedProfile?.middleName || '',
+        lastName: matchedProfile?.last_name || matchedProfile?.lastName || 'Santos',
+        name:
+          matchedProfile?.full_name ||
+          matchedProfile?.name ||
+          `${matchedProfile?.first_name || matchedProfile?.firstName || 'Adones'} ${matchedProfile?.last_name || matchedProfile?.lastName || 'Santos'}`.trim(),
         email: cleanEmail,
         phone: matchedProfile?.phone || '+63 917 842 1099',
         address: matchedProfile?.address || 'Unit 402, Katipunan Ave, Quezon City, Metro Manila',
@@ -587,43 +749,37 @@ export const AppProvider = ({ children }) => {
         documents: userDocs,
         isVerified: true,
         onboardingCompleted: hasDoneOnboarding,
+        onboarding_completed: hasDoneOnboarding,
       };
 
       setUser(userToLogin);
       setIsAuthenticated(true);
       setViewMode('user');
-      setActiveTab('home');
       setOnboardingCompleted(hasDoneOnboarding);
       localStorage.setItem('alalay_auth', 'true');
+      localStorage.setItem('alalay_onboarding_done', hasDoneOnboarding ? 'true' : 'false');
+      localStorage.setItem('alalay_user', JSON.stringify(userToLogin));
 
-      // If returning user, set their synced documents right away
       if (hasDoneOnboarding) {
         setDocuments(userDocs);
         localStorage.setItem('alalay_documents', JSON.stringify(userDocs));
-      }
-
-      if (isFirstTime) {
-        addToast(
-          'eGov PH Verified ✓',
-          `Welcome, ${userToLogin.firstName}! Please complete your 3-step setup.`,
-          'success'
-        );
-      } else {
         addToast(
           'Welcome Back ✓',
           `Logged in as ${userToLogin.firstName || userToLogin.name}!`,
           'success'
         );
+      } else {
+        addToast(
+          'eGov PH Verified ✓',
+          `Welcome, ${userToLogin.firstName}! Please complete your 3-step setup.`,
+          'success'
+        );
       }
 
-      return { success: true, user: userToLogin, isFirstTime };
+      return { success: true, isFirstTime };
     } else {
-      addToast(
-        'Invalid eGov OTP',
-        `The OTP "${cleanOtp}" does not match the 6-character passcode saved by the admin.`,
-        'error'
-      );
-      return { success: false, message: 'Invalid OTP code' };
+      addToast('Invalid OTP', 'The OTP passcode you entered is incorrect.', 'error');
+      return { success: false, message: 'Invalid OTP' };
     }
   };
 
@@ -711,15 +867,34 @@ export const AppProvider = ({ children }) => {
 
   const logout = () => {
     setIsAuthenticated(false);
-    setUser(INITIAL_USER);
+    setOnboardingCompleted(false);
+    setUser(null);
     setDocuments([]);
     localStorage.setItem('alalay_auth', 'false');
+    localStorage.setItem('alalay_onboarding_done', 'false');
+    localStorage.removeItem('alalay_user');
     localStorage.removeItem('alalay_documents');
     addToast('Logged Out', 'You have been signed out.', 'info');
   };
 
   // Dynamic Add Managed User to Supabase
-  const addManagedUser = async ({ firstName, middleName = '', lastName, email, role, otpCode, documents = [] }) => {
+  const addManagedUser = async ({
+    firstName,
+    middleName = '',
+    lastName,
+    email,
+    role,
+    otpCode,
+    birthDate = '1992-04-18',
+    citizenship = 'Filipino',
+    civilStatus = 'Single',
+    isSeniorCitizen = false,
+    isPwd = false,
+    isSoloParent = false,
+    employmentStatus = 'Employed',
+    monthlyIncome = '₱25,000 - ₱35,000',
+    documents = [],
+  }) => {
     const initials = `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || 'U';
     const dbRole = (role || 'Citizen').toLowerCase().replace(' ', '_');
 
@@ -733,6 +908,14 @@ export const AppProvider = ({ children }) => {
       lastName,
       role: dbRole,
       otpCode,
+      birthDate,
+      citizenship,
+      civilStatus,
+      isSeniorCitizen,
+      isPwd,
+      isSoloParent,
+      employmentStatus,
+      monthlyIncome,
     });
 
     if (createdUserRes?.id) {
@@ -775,6 +958,21 @@ export const AppProvider = ({ children }) => {
       avatarInitials: initials,
       avatarBg: dbRole === 'super_admin' ? 'bg-indigo-600' : 'bg-blue-600',
       otpCode: otpCode || '891024',
+      birthDate,
+      birth_date: birthDate,
+      citizenship,
+      civilStatus,
+      civil_status: civilStatus,
+      isSeniorCitizen,
+      is_senior_citizen: isSeniorCitizen,
+      isPwd,
+      is_pwd: isPwd,
+      isSoloParent,
+      is_solo_parent: isSoloParent,
+      employmentStatus,
+      employment_status: employmentStatus,
+      monthlyIncome,
+      monthly_income: monthlyIncome,
       documents: formattedDocs,
       createdAt: new Date().toISOString().split('T')[0],
     };
@@ -1031,13 +1229,104 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Remove Knowledge Source from Supabase
+  // Remove Knowledge Source and all its scraped opportunities/data
   const removeKnowledgeSource = async (id) => {
+    const targetSource = sources.find((s) => s.id === id);
+    const targetUrl =
+      targetSource?.rawUrl ||
+      targetSource?.official_url ||
+      targetSource?.officialUrl ||
+      targetSource?.source_url ||
+      targetSource?.url ||
+      '';
+    const domain = targetUrl
+      ? targetUrl.replace(/^https?:\/\//, '').split('/')[0].toLowerCase()
+      : '';
+    const agencyName = targetSource?.name || targetSource?.agency_name || '';
+
+    // 0. Record in persistent deleted sources blacklist so it never resurfaces
+    try {
+      const existingDeleted = JSON.parse(localStorage.getItem('alalay_deleted_sources') || '[]');
+      const newDeleted = [
+        ...new Set(
+          [...existingDeleted, id, targetUrl, domain, agencyName].filter(Boolean)
+        ),
+      ];
+      localStorage.setItem('alalay_deleted_sources', JSON.stringify(newDeleted));
+    } catch (e) {}
+
+    // 1. Delete source and associated opportunities from Supabase
     if (isSupabaseConfigured) {
-      await deleteKnowledgeSource(id);
+      await deleteKnowledgeSource(id, targetUrl, agencyName);
+      if (domain || agencyName) {
+        await deleteOpportunitiesBySourceUrl(domain, agencyName);
+      }
     }
-    setSources((prev) => prev.filter((s) => s.id !== id));
-    addToast('Source Deleted', 'Knowledge source deleted from Supabase online database.', 'info');
+
+    // 2. Completely remove knowledge source from state and localStorage
+    setSources((prev) => {
+      const updated = prev.filter((s) => {
+        const sUrl = (s.rawUrl || s.official_url || s.officialUrl || s.url || '').toLowerCase();
+        const sName = (s.name || s.agency_name || '').toLowerCase();
+        const isMatch =
+          s.id === id ||
+          (domain && sUrl.includes(domain)) ||
+          (agencyName && sName === agencyName.toLowerCase());
+        return !isMatch;
+      });
+      localStorage.setItem('alalay_sources', JSON.stringify(updated));
+      return updated;
+    });
+
+    // 3. Remove all scraped opportunities and vacancies originating from this website
+    let deletedCount = 0;
+    setOpportunities((prev) => {
+      const domainKey = domain.replace(/^www\./, '').split('.')[0];
+      const remaining = prev.filter((opp) => {
+        const oppUrl = (opp.officialSource?.url || '').toLowerCase();
+        const oppAgency = (opp.agency || '').toLowerCase();
+        const oppTitle = (opp.title || '').toLowerCase();
+        const oppId = (opp.id || '').toLowerCase();
+
+        const isMatch =
+          (domain && (oppUrl.includes(domain) || (domainKey && oppId.includes(domainKey)))) ||
+          (agencyName &&
+            (oppAgency.includes(agencyName.toLowerCase()) ||
+              oppTitle.includes(agencyName.toLowerCase())));
+
+        if (isMatch) deletedCount++;
+        return !isMatch;
+      });
+      localStorage.setItem('alalay_opportunities', JSON.stringify(remaining));
+      return remaining;
+    });
+
+    // 4. Remove any pending items in review queue
+    setReviewQueue((prev) => {
+      const remaining = prev.filter((item) => {
+        const itemUrl = (item.source_url || item.url || '').toLowerCase();
+        const isMatch = domain && itemUrl.includes(domain);
+        return !isMatch;
+      });
+      localStorage.setItem('alalay_review_queue', JSON.stringify(remaining));
+      return remaining;
+    });
+
+    // 5. Create Audit Log
+    if (isSupabaseConfigured) {
+      createAuditLog({
+        action: 'DELETE_KNOWLEDGE_SOURCE',
+        actor: user?.email || 'Admin',
+        target: targetSource?.name || targetUrl,
+        details: `Completely removed website from admin directory and purged ${deletedCount} associated opportunities.`,
+      });
+    }
+
+    addToast(
+      'Website Completely Removed',
+      `"${targetSource?.name || targetUrl || 'Website'}" removed from the admin directory, and ${deletedCount} scraped opportunities purged.`,
+      'info'
+    );
   };
 
   // Run Live Facebook Scraper Pipeline with SHA-256 Deduplication & Allowlist Safeguards
@@ -1094,8 +1383,55 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const openAskAlalay = (opp = null) => {
+  const saveChatArchive = async (archiveData) => {
+    const userEmail = (user?.email || '').toLowerCase().trim();
+    const userId = user?.id || '';
+    const dataWithUser = {
+      ...archiveData,
+      userEmail,
+      userId,
+    };
+
+    const userKey = `alalay_chat_archives_${userEmail || userId || 'default'}`;
+
+    setChatArchives((prev) => {
+      const existingIdx = prev.findIndex((a) => a.id === archiveData.id);
+      let updated;
+      if (existingIdx >= 0) {
+        updated = [...prev];
+        updated[existingIdx] = { ...updated[existingIdx], ...dataWithUser };
+      } else {
+        updated = [dataWithUser, ...prev];
+      }
+      localStorage.setItem(userKey, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isSupabaseConfigured) {
+      await saveChatArchiveToSupabase(dataWithUser);
+    }
+  };
+
+  const deleteChatArchive = async (id) => {
+    const userEmail = (user?.email || '').toLowerCase().trim();
+    const userId = user?.id || '';
+    const userKey = `alalay_chat_archives_${userEmail || userId || 'default'}`;
+
+    setChatArchives((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      localStorage.setItem(userKey, JSON.stringify(updated));
+      return updated;
+    });
+
+    if (isSupabaseConfigured) {
+      await deleteChatArchiveFromSupabase(id);
+    }
+    addToast('Archive Removed', 'Consultation deleted from your chat history.', 'info');
+  };
+
+  const openAskAlalay = (opp = null, session = null) => {
     setAskAlalayOpportunity(opp);
+    setLoadedChatSession(session);
     setAskAlalayOpen(true);
   };
 
@@ -1123,6 +1459,7 @@ export const AppProvider = ({ children }) => {
         logout,
         user,
         setUser,
+        updateUserProfile,
         onboardingCompleted,
         setOnboardingCompleted,
         consentGiven,
@@ -1142,6 +1479,13 @@ export const AppProvider = ({ children }) => {
         notifications,
         auditLogs,
         unreadCount,
+        // Chat Archives
+        chatArchives,
+        setChatArchives,
+        saveChatArchive,
+        deleteChatArchive,
+        loadedChatSession,
+        setLoadedChatSession,
         // Managed Users
         managedUsers,
         setManagedUsers,

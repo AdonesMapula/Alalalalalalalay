@@ -145,39 +145,36 @@ export function generateContentHash(normalizedText) {
   return (hexStr + hexStr + hexStr + hexStr + hexStr + hexStr + hexStr + hexStr).substring(0, 64);
 }
 
-/**
- * Scrape a public Facebook Page HTML and extract content safely with CORS bypass
- */
 export async function scrapePublicFacebookPage(sourceUrl) {
   const posts = [];
+  const cleanUrl = (sourceUrl || '').trim();
+
+  if (!cleanUrl || cleanUrl.length < 5) {
+    return getFallbackPostsForSource(cleanUrl || 'https://facebook.com/DOHgovPH', 'Offline fallback');
+  }
+
+  const normalizedTarget = cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')
+    ? cleanUrl
+    : `https://${cleanUrl}`;
 
   try {
     let html = '';
 
-    // 1. Try local dev proxy / CORS proxies
-    const proxyStrategies = [
-      `/api/proxy-scrape?url=${encodeURIComponent(sourceUrl)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(sourceUrl)}`,
-      `https://corsproxy.io/?url=${encodeURIComponent(sourceUrl)}`,
-    ];
-
-    for (const pUrl of proxyStrategies) {
-      try {
-        const res = await fetch(pUrl);
-        if (res.ok) {
-          const t = await res.text();
-          if (t && t.length > 50 && !t.startsWith('{"error"')) {
-            html = t;
-            break;
-          }
+    // 1. Primary: Local Vite Node.js dev proxy
+    try {
+      const res = await fetch(`/api/proxy-scrape?url=${encodeURIComponent(normalizedTarget)}`);
+      if (res.ok) {
+        const t = await res.text();
+        if (t && t.length > 50 && !t.startsWith('{"error"') && !t.includes('cf-browser-verification')) {
+          html = t;
         }
-      } catch (e) {
-        // next strategy
       }
+    } catch (e) {
+      // local proxy error
     }
 
     if (!html) {
-      return getFallbackPostsForSource(sourceUrl, 'Offline fallback');
+      return getFallbackPostsForSource(normalizedTarget, 'Offline fallback');
     }
 
     const $ = cheerio.load(html);
@@ -420,7 +417,13 @@ export async function runFacebookSyncPipeline(customSources = null, onProgress =
     }
 
     try {
-      const url = source.source_url || source.url || '';
+      const url =
+        source.official_url ||
+        source.officialUrl ||
+        source.source_url ||
+        source.sourceUrl ||
+        source.url ||
+        '';
       sourcesProcessed++;
 
       const extractedPosts = await scrapePublicFacebookPage(url);

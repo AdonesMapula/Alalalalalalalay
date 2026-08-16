@@ -418,8 +418,20 @@ export const KnowledgeSourcesView = () => {
 
                           <button
                             type="button"
-                            title="Delete Knowledge Source"
-                            onClick={() => removeKnowledgeSource(row.id)}
+                            title="Delete Website & All Scraped Data"
+                            onClick={() => {
+                              const name = row.name || row.url || 'this source';
+                              if (
+                                window.confirm(
+                                  `Delete "${name}"?\n\nThis will permanently remove this website and all associated scraped job postings and citizen opportunities.`
+                                )
+                              ) {
+                                removeKnowledgeSource(row.id);
+                                if (selectedDetailSource?.id === row.id) {
+                                  setSelectedDetailSource(null);
+                                }
+                              }
+                            }}
                             className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           >
                             <Trash2 className="w-4 h-4" />

@@ -23,13 +23,34 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     role user_role NOT NULL DEFAULT 'citizen',
     phone TEXT,
     address TEXT,
+    birth_date DATE DEFAULT '1992-04-18',
+    citizenship TEXT DEFAULT 'Filipino',
+    civil_status TEXT DEFAULT 'Single',
+    is_senior_citizen BOOLEAN DEFAULT FALSE,
+    is_pwd BOOLEAN DEFAULT FALSE,
+    is_solo_parent BOOLEAN DEFAULT FALSE,
+    employment_status TEXT DEFAULT 'Employed',
+    monthly_income TEXT DEFAULT '₱25,000 - ₱35,000',
     otp_code VARCHAR(10) DEFAULT '891024',
     status TEXT DEFAULT 'Active',
     avatar_initials VARCHAR(4),
     egov_verified BOOLEAN DEFAULT FALSE,
+    onboarding_completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Ensure demographic and onboarding columns exist on existing tables
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS birth_date DATE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS citizenship TEXT DEFAULT 'Filipino';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS civil_status TEXT DEFAULT 'Single';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_senior_citizen BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_pwd BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_solo_parent BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS employment_status TEXT DEFAULT 'Employed';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS monthly_income TEXT DEFAULT '₱25,000 - ₱35,000';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS egov_verified BOOLEAN DEFAULT FALSE;
 
 -- 3. Create Documents Table (ID Cards & Paper-based files)
 CREATE TABLE IF NOT EXISTS public.documents (
@@ -103,6 +124,22 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 7. Create Chat Archives Table (Real AI Consultations & History)
+CREATE TABLE IF NOT EXISTS public.chat_archives (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    user_email TEXT,
+    title TEXT NOT NULL,
+    category TEXT DEFAULT 'General Public Services',
+    category_color TEXT DEFAULT '#093a96',
+    preview TEXT,
+    message_count INT DEFAULT 0,
+    source_url TEXT,
+    messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- ==============================================================================
 -- ROW LEVEL SECURITY (RLS) & RBAC POLICIES
 -- ==============================================================================
@@ -112,6 +149,7 @@ ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.knowledge_sources ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.opportunities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_archives ENABLE ROW LEVEL SECURITY;
 
 -- 1. Profiles Policies:
 -- Allow public/anon read and insert for the prototype application
@@ -142,6 +180,10 @@ CREATE POLICY "Allow all on opportunities" ON public.opportunities FOR ALL USING
 -- 5. Audit Logs Policies:
 DROP POLICY IF EXISTS "Allow all on audit_logs" ON public.audit_logs;
 CREATE POLICY "Allow all on audit_logs" ON public.audit_logs FOR ALL USING (true) WITH CHECK (true);
+
+-- 6. Chat Archives Policies:
+DROP POLICY IF EXISTS "Allow all on chat_archives" ON public.chat_archives;
+CREATE POLICY "Allow all on chat_archives" ON public.chat_archives FOR ALL USING (true) WITH CHECK (true);
 
 -- ==============================================================================
 -- INITIAL SEED DATA

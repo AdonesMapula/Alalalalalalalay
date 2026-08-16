@@ -17,12 +17,14 @@ import {
   FileText,
   ExternalLink,
   Globe,
+  Award,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSSearchBar } from '../common/IOSSearchBar';
 import { IOSCard } from '../common/IOSCard';
 import { IOSSegmentedControl } from '../common/IOSSegmentedControl';
 import { EligibilityStatusBadge } from '../common/IOSBadge';
+import { rankAndFilterOpportunities, calculateCitizenAge } from '../../services/rulesEngine';
 
 export const ExploreCategories = () => {
   const {
@@ -35,7 +37,12 @@ export const ExploreCategories = () => {
     selectedEligibilityFilter,
     setSelectedEligibilityFilter,
     setSelectedOpportunity,
+    user,
+    documents,
   } = useApp();
+
+  const userAge = calculateCitizenAge(user);
+  const isSenior = Boolean(user?.isSeniorCitizen || user?.is_senior_citizen || userAge >= 60);
 
   const iconMap = {
     Sparkles,
@@ -52,9 +59,14 @@ export const ExploreCategories = () => {
 
   const eligibilityOptions = [
     { id: 'all', label: 'All Statuses' },
-    { id: 'Likely Eligible', label: 'Likely Eligible (85%+)' },
+    { id: 'Likely Eligible', label: 'Top Qualified (85%+)' },
     { id: 'Needs Review', label: 'Needs Action' },
   ];
+
+  // Dynamically rank all opportunities for this citizen
+  const rankedOpportunities = useMemo(() => {
+    return rankAndFilterOpportunities(opportunities, user, documents);
+  }, [opportunities, user, documents]);
 
   // Dynamically compute unique categories from opportunities & default categories
   const dynamicCategories = useMemo(() => {
@@ -79,7 +91,7 @@ export const ExploreCategories = () => {
 
   // Filtered opportunities
   const filteredOpportunities = useMemo(() => {
-    return (opportunities || []).filter((opp) => {
+    return (rankedOpportunities || []).filter((opp) => {
       const oppCat = (opp.category || '').toLowerCase();
       const selCat = (selectedCategory || 'all').toLowerCase();
 
@@ -96,7 +108,8 @@ export const ExploreCategories = () => {
         (opp.title && opp.title.toLowerCase().includes(q)) ||
         (opp.agency && opp.agency.toLowerCase().includes(q)) ||
         (opp.shortDesc && opp.shortDesc.toLowerCase().includes(q)) ||
-        (opp.categoryName && opp.categoryName.toLowerCase().includes(q));
+        (opp.categoryName && opp.categoryName.toLowerCase().includes(q)) ||
+        (opp.matchBadge && opp.matchBadge.toLowerCase().includes(q));
 
       // Eligibility filter
       const matchesEligibility =
@@ -106,25 +119,34 @@ export const ExploreCategories = () => {
 
       return matchesCategory && matchesSearch && matchesEligibility;
     });
-  }, [opportunities, selectedCategory, searchQuery, selectedEligibilityFilter]);
+  }, [rankedOpportunities, selectedCategory, searchQuery, selectedEligibilityFilter]);
 
   return (
     <div className="space-y-6 select-none max-w-6xl mx-auto pb-12">
       {/* Search and Header */}
       <div className="space-y-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1C1C1E] tracking-tight">
-            Explore Opportunities & Services
-          </h1>
-          <p className="text-xs sm:text-sm text-[#8E8E93] mt-1">
-            Discover all verified Philippine government programs, statutory assistance, and live-scraped circulars
-          </p>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1C1C1E] tracking-tight">
+              Explore Opportunities & Services
+            </h1>
+            <p className="text-xs sm:text-sm text-[#8E8E93] mt-1">
+              Discover verified Philippine government programs, statutory assistance, and live-scraped circulars
+            </p>
+          </div>
+
+          {isSenior && (
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
+              <Award className="w-4 h-4 text-amber-700" />
+              <span>Senior Citizen Match Filter Active ({userAge} yrs)</span>
+            </div>
+          )}
         </div>
 
         <IOSSearchBar
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Search by benefit name, agency (PhilHealth, SSS, CHED, DOH, DepEd), or keyword..."
+          placeholder="Search by benefit name, agency (PhilHealth, SSS, CHED, DOH, DepEd, OSCA), or keyword..."
         />
       </div>
 
@@ -171,8 +193,6 @@ export const ExploreCategories = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filteredOpportunities.map((opp) => {
             const reqs = opp.requirements || [];
-            const metCount = reqs.filter((r) => typeof r === 'object' && r.status === 'met').length;
-            const totalReqs = Math.max(reqs.length, 1);
             const sourceUrl = opp.officialSource?.url || '';
 
             return (
@@ -180,11 +200,15 @@ export const ExploreCategories = () => {
                 key={opp.id}
                 hoverable
                 onClick={() => setSelectedOpportunity(opp)}
-                className="flex flex-col justify-between space-y-4 group bg-white border border-slate-200/85 hover:border-blue-300 shadow-sm hover:shadow-md transition-all duration-200"
+                className={`flex flex-col justify-between space-y-4 group bg-white border shadow-sm hover:shadow-md transition-all duration-200 ${
+                  opp.isSeniorPriority
+                    ? 'border-amber-300 ring-1 ring-amber-200'
+                    : 'border-slate-200/85 hover:border-blue-300'
+                }`}
               >
                 <div className="space-y-2.5">
                   {/* Top Agency & Match Badges */}
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span
                       className="text-xs font-bold px-3 py-1 rounded-full text-white shadow-2xs"
                       style={{ backgroundColor: opp.categoryColor || '#007AFF' }}
@@ -192,60 +216,71 @@ export const ExploreCategories = () => {
                       {opp.agency || 'Government Service'}
                     </span>
 
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/80">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${
+                          opp.isSeniorPriority
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-200/80'
+                        }`}
+                      >
                         {opp.matchScore || 90}% Match
                       </span>
                       <EligibilityStatusBadge status={opp.matchStatus || 'Likely Eligible'} />
                     </div>
                   </div>
 
-                  {/* Opportunity Title */}
-                  <h3 className="text-base sm:text-lg font-bold text-[#1C1C1E] group-hover:text-[#007AFF] transition-colors leading-snug">
-                    {opp.title}
-                  </h3>
-
-                  {/* Opportunity Description */}
-                  <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed font-normal">
-                    {opp.shortDesc || opp.fullDesc || 'Verified government citizen assistance and benefit program.'}
-                  </p>
-                </div>
-
-                {/* Footer with Requirements Progress & Details button */}
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-xs text-slate-600">
-                    <div className="flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                      <span className="truncate text-[11px] font-medium">
-                        {metCount > 0 ? `${metCount} of ${totalReqs} requirements met` : 'Verified Citizen Credentials'}
-                      </span>
-                    </div>
-
-                    <span className="text-[11px] font-bold text-[#007AFF] group-hover:translate-x-0.5 ios-spring flex items-center gap-0.5">
-                      <span>View Service</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-
-                  {sourceUrl && (
-                    <div className="flex items-center gap-1 text-[10px] text-slate-400 truncate">
-                      <Globe className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                      <span className="truncate">{sourceUrl.replace(/^https?:\/\//, '')}</span>
+                  {/* Demographic Match Tag (if applicable) */}
+                  {opp.matchBadge && (
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-[#093a96] border border-blue-200 text-[10px] font-bold">
+                      <Sparkles className="w-3 h-3 text-[#093a96]" />
+                      <span>{opp.matchBadge}</span>
                     </div>
                   )}
+
+                  {/* Title and Description */}
+                  <div>
+                    <h3 className="text-base font-bold text-[#1C1C1E] group-hover:text-[#007AFF] transition-colors leading-snug">
+                      {opp.title}
+                    </h3>
+                    <p className="text-xs text-[#8E8E93] line-clamp-2 mt-1 leading-relaxed">
+                      {opp.shortDesc || opp.fullDesc || 'Official government assistance and citizen support opportunity.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Card Footer */}
+                <div className="pt-3 border-t border-[#F2F2F7] flex items-center justify-between text-xs text-[#8E8E93]">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                    <span>Citizen Charter</span>
+                  </div>
+
+                  {opp.totalDocCount > 0 && (
+                    <span className="text-[10px] font-bold text-slate-500">
+                      Locker: <strong className={opp.docReadinessPercent === 100 ? 'text-emerald-600' : 'text-blue-600'}>{opp.matchedDocCount}/{opp.totalDocCount} Docs</strong>
+                    </span>
+                  )}
+
+                  <span className="text-[#007AFF] font-bold inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                    View Service
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </span>
                 </div>
               </IOSCard>
             );
           })}
         </div>
       ) : (
-        <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8 space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+        <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-[#C6C6C8] space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#007AFF] flex items-center justify-center mx-auto">
             <Search className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-[#1C1C1E]">No opportunities match your search</h3>
+          <h3 className="text-base font-bold text-[#1C1C1E]">
+            No Matching Services Found
+          </h3>
           <p className="text-xs text-[#8E8E93] max-w-sm mx-auto">
-            Try adjusting your keyword, resetting filters, or selecting "All Services".
+            No public services matched your search query. Try clearing filters or searching for another government program.
           </p>
           <button
             type="button"
@@ -254,9 +289,9 @@ export const ExploreCategories = () => {
               setSelectedCategory('all');
               setSelectedEligibilityFilter('all');
             }}
-            className="text-xs font-bold text-[#007AFF] hover:underline cursor-pointer pt-2"
+            className="px-4 py-2 rounded-xl bg-[#007AFF] text-white text-xs font-bold shadow-xs hover:bg-[#0066d6] cursor-pointer transition-colors"
           >
-            Reset Filters
+            Reset Search Filters
           </button>
         </div>
       )}

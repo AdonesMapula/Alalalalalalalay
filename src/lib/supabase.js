@@ -57,6 +57,14 @@ export const signUpWithSupabase = async ({ email, password, firstName, middleNam
       status: 'Active',
       avatar_initials: `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase() || 'AD',
       egov_verified: true,
+      birth_date: userData.birthDate || userData.birth_date || null,
+      citizenship: userData.citizenship || 'Filipino',
+      civil_status: userData.civilStatus || userData.civil_status || 'Single',
+      is_senior_citizen: Boolean(userData.isSeniorCitizen || userData.is_senior_citizen),
+      is_pwd: Boolean(userData.isPwd || userData.is_pwd),
+      is_solo_parent: Boolean(userData.isSoloParent || userData.is_solo_parent),
+      employment_status: userData.employmentStatus || userData.employment_status || 'Employed',
+      monthly_income: userData.monthlyIncome || userData.monthly_income || '₱25,000 - ₱35,000',
     };
 
     if (createdAuthUser?.id) {
@@ -228,13 +236,67 @@ export const updateKnowledgeSource = async (id, updateData) => {
   }
 };
 
-export const deleteKnowledgeSource = async (id) => {
+export const deleteKnowledgeSource = async (id, targetUrl, name) => {
   if (!isSupabaseConfigured) return { data: null, error: 'Not configured' };
   try {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''));
+    if (isUUID) {
+      const { data, error } = await supabase
+        .from('knowledge_sources')
+        .delete()
+        .eq('id', id);
+      return { data, error };
+    }
+
+    // Match by URL or name if non-UUID
+    let query = supabase.from('knowledge_sources').delete();
+    if (targetUrl) {
+      const cleanUrl = targetUrl.replace(/^https?:\/\//, '').split('/')[0];
+      query = query.or(`official_url.ilike.%${cleanUrl}%,name.ilike.%${name || cleanUrl}%`);
+    } else if (name) {
+      query = query.ilike('name', `%${name}%`);
+    } else {
+      query = query.eq('id', id);
+    }
+    const { data, error } = await query;
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
+export const deleteOpportunitiesBySourceUrl = async (urlPattern, agencyName) => {
+  if (!isSupabaseConfigured) return { data: null, error: 'Not configured' };
+  try {
+    const domain = (urlPattern || '').replace(/^https?:\/\//, '').split('/')[0].toLowerCase();
+    const domainKeyword = domain.replace(/^www\./, '').split('.')[0];
+    let query = supabase.from('opportunities').delete();
+    
+    if (domainKeyword && agencyName) {
+      query = query.or(
+        `official_source->>url.ilike.%${domain}%,agency.ilike.%${agencyName}%,title.ilike.%${agencyName}%,title.ilike.%${domainKeyword}%`
+      );
+    } else if (domainKeyword) {
+      query = query.or(
+        `official_source->>url.ilike.%${domain}%,title.ilike.%${domainKeyword}%,agency.ilike.%${domainKeyword}%`
+      );
+    } else if (agencyName) {
+      query = query.or(`agency.ilike.%${agencyName}%,title.ilike.%${agencyName}%`);
+    }
+    const { data, error } = await query;
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
+export const deleteOpportunitiesByIds = async (ids) => {
+  if (!isSupabaseConfigured || !ids?.length) return { data: null, error: 'Not configured' };
+  try {
     const { data, error } = await supabase
-      .from('knowledge_sources')
+      .from('opportunities')
       .delete()
-      .eq('id', id);
+      .in('id', ids);
     return { data, error };
   } catch (err) {
     return { data: null, error: err.message };
@@ -370,6 +432,115 @@ export const createAuditLog = async (logData) => {
     const { data, error } = await supabase
       .from('audit_logs')
       .insert([logData]);
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
+// 6. Dynamic Chat Archives API (Real Citizen & AI Consultation History - User Isolated)
+export const fetchChatArchives = async (userEmail = '', userId = '') => {
+  if (!isSupabaseConfigured) return { data: null, error: 'Not configured' };
+  try {
+    const cleanEmail = (userEmail || '').toLowerCase().trim();
+    if (!cleanEmail && !userId) {
+      return { data: [], error: null };
+    }
+
+    let query = supabase
+      .from('chat_archives')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
+    if (isUUID && cleanEmail) {
+      query = query.or(`user_id.eq.${userId},user_email.ilike.${cleanEmail}`);
+    } else if (isUUID) {
+      query = query.eq('user_id', userId);
+    } else if (cleanEmail) {
+      query = query.ilike('user_email', cleanEmail);
+    }
+
+    const { data, error } = await query;
+    if (data) {
+      const formatted = data.map((c) => ({
+        id: c.id,
+        userId: c.user_id,
+        userEmail: c.user_email,
+        title: c.title,
+        category: c.category || 'General',
+        categoryColor: c.category_color || '#093a96',
+        preview: c.preview || '',
+        messageCount: c.message_count || (c.messages?.length || 0),
+        sourceUrl: c.source_url || '',
+        messages: c.messages || [],
+        timestamp: c.created_at,
+        dateFormatted: new Date(c.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }) + ' • ' + new Date(c.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      }));
+      return { data: formatted, error: null };
+    }
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
+export const saveChatArchiveToSupabase = async (archiveData) => {
+  if (!isSupabaseConfigured || !archiveData) return { data: null, error: 'Not configured' };
+  try {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(archiveData.id);
+    const userIdValid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(archiveData.userId);
+
+    const payload = {
+      title: archiveData.title || 'Citizen AI Consultation',
+      category: archiveData.category || 'General',
+      category_color: archiveData.categoryColor || '#093a96',
+      preview: archiveData.preview || '',
+      message_count: archiveData.messages?.length || archiveData.messageCount || 0,
+      source_url: archiveData.sourceUrl || '',
+      messages: archiveData.messages || [],
+      user_email: archiveData.userEmail || '',
+      updated_at: new Date().toISOString(),
+    };
+
+    if (userIdValid) {
+      payload.user_id = archiveData.userId;
+    }
+
+    if (isUUID) {
+      payload.id = archiveData.id;
+      const { data, error } = await supabase
+        .from('chat_archives')
+        .upsert(payload)
+        .select();
+      return { data, error };
+    } else {
+      const { data, error } = await supabase
+        .from('chat_archives')
+        .insert([payload])
+        .select();
+      return { data, error };
+    }
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
+export const deleteChatArchiveFromSupabase = async (id) => {
+  if (!isSupabaseConfigured || !id) return { data: null, error: 'Not configured' };
+  try {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!isUUID) return { data: null, error: null };
+
+    const { data, error } = await supabase
+      .from('chat_archives')
+      .delete()
+      .eq('id', id);
     return { data, error };
   } catch (err) {
     return { data: null, error: err.message };

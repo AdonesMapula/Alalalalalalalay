@@ -15,6 +15,8 @@ import { HomeDashboard } from './components/user/HomeDashboard';
 import { ExploreCategories } from './components/user/ExploreCategories';
 import { DocumentsView } from './components/user/DocumentsView';
 import { NotificationsView } from './components/user/NotificationsView';
+import { ChatArchivesView } from './components/user/ChatArchivesView';
+import { AskAlalayPageView } from './components/user/AskAlalayPageView';
 import { UserProfileView } from './components/user/UserProfileView';
 import { OpportunityDetailModal } from './components/user/OpportunityDetailModal';
 import { AskAlalayChatModal } from './components/user/AskAlalayChatModal';
@@ -64,7 +66,7 @@ const MainAppContent = () => {
   // Super Admin Portal (Accessed via localhost/admin or /admin URL)
   if (viewMode === 'admin') {
     return (
-      <div className="min-h-screen bg-[#F4F5FB] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white">
+      <div className="h-screen bg-[#F4F5FB] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white overflow-hidden">
         <AdminDashboard />
         <ToastContainer />
       </div>
@@ -119,22 +121,29 @@ const MainAppContent = () => {
 
   // Authenticated Citizen Dashboard
   return (
-    <div className="min-h-screen bg-[#f8fafd] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white">
+    <div className="h-screen bg-[#f8fafd] flex flex-col text-[#0f172a] selection:bg-[#093a96] selection:text-white overflow-hidden">
       {/* Main Container Layout */}
-      <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
+      <div className="flex-1 flex max-w-[1600px] w-full mx-auto h-full overflow-hidden">
         {/* Left Desktop Sidebar */}
         <Sidebar />
 
         {/* Main Content Workspace */}
-        <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafd]">
+        <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafd] h-full overflow-hidden">
           {/* Header Greeting Bar */}
           <Header />
 
           {/* Dynamic Tab Router */}
-          <main className="flex-1 px-6 sm:px-10 pb-20 md:pb-10 overflow-y-auto">
+          <main
+            className={`flex-1 min-h-0 ${activeTab === 'ai-chat'
+                ? 'px-4 sm:px-6 pb-3 overflow-hidden flex flex-col'
+                : 'px-6 sm:px-10 pb-20 md:pb-10 overflow-y-auto'
+              }`}
+          >
             {activeTab === 'home' && <HomeDashboard />}
             {activeTab === 'explore' && <ExploreCategories />}
+            {/* {activeTab === 'ai-chat' && <AskAlalayPageView />} */}
             {activeTab === 'documents' && <DocumentsView />}
+            {activeTab === 'chat-history' && <ChatArchivesView />}
             {activeTab === 'notifications' && <NotificationsView />}
             {activeTab === 'profile' && <UserProfileView />}
           </main>

@@ -770,3 +770,5 @@ export const AUDIT_LOGS = [
     details: 'AI clarified that only SSS can make final loan credit decisions; displayed official agency disclaimer.'
   }
 ];
+
+export const INITIAL_CHAT_ARCHIVES = [];

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   UserPlus,
   KeyRound,
@@ -11,10 +11,28 @@ import {
   X,
   CreditCard,
   FileCheck,
+  Calendar,
+  Flag,
+  Heart,
+  Briefcase,
+  Wallet,
+  Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSSheet } from '../common/IOSSheet';
 import { IOSButton } from '../common/IOSButton';
+
+function calculateAge(dateString) {
+  if (!dateString) return null;
+  const today = new Date();
+  const birth = new Date(dateString);
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return isNaN(age) ? null : age;
+}
 
 export const AddUserModal = () => {
   const { addUserModalOpen, setAddUserModalOpen, addManagedUser } = useApp();
@@ -23,22 +41,61 @@ export const AddUserModal = () => {
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('System Admin');
+  const [role, setRole] = useState('Citizen User');
   const [otpCode, setOtpCode] = useState(() => Math.floor(100000 + Math.random() * 900000).toString());
 
-  // Uploaded Documents List (Unlimited ID Cards & Paper-based documents)
+  // Demographic Fields
+  const [birthDate, setBirthDate] = useState('1992-04-18');
+  const [citizenship, setCitizenship] = useState('Filipino');
+  const [civilStatus, setCivilStatus] = useState('Single');
+  const [isSeniorCitizen, setIsSeniorCitizen] = useState(false);
+  const [isPwd, setIsPwd] = useState(false);
+  const [isSoloParent, setIsSoloParent] = useState(false);
+  const [employmentStatus, setEmploymentStatus] = useState('Employed');
+  const [monthlyIncome, setMonthlyIncome] = useState('₱25,000 - ₱35,000');
+
+  // Uploaded Documents List
   const [attachedDocs, setAttachedDocs] = useState([
-    { id: 'doc_init_1', name: 'PhilSys National ID.pdf', type: 'ID Card', size: '1.4 MB' }
+    { id: 'doc_init_1', name: 'PhilSys National ID.pdf', type: 'ID Card (National ID / OSCA / Driver)', size: '1.4 MB' },
   ]);
 
   const documentTypeOptions = [
     'ID Card (National ID / OSCA / Driver)',
+    'Senior Citizen OSCA ID Card',
+    'PWD Identification Card',
+    'Solo Parent Identification Card',
     'Paper Document (Birth Certificate / Clearance)',
     'Appointment Letter / Authorization',
     'Barangay Certificate of Residency',
     'Official Service Record',
     'Other Supporting Document',
   ];
+
+  // Auto-detect Senior Citizen from birth date
+  const calculatedAge = calculateAge(birthDate);
+
+  useEffect(() => {
+    if (calculatedAge !== null && calculatedAge >= 60) {
+      setIsSeniorCitizen(true);
+      // Auto suggest OSCA Senior ID if not yet attached
+      setAttachedDocs((prev) => {
+        if (!prev.some((d) => d.name.toLowerCase().includes('senior') || d.name.toLowerCase().includes('osca'))) {
+          return [
+            ...prev,
+            {
+              id: `doc_osca_${Date.now()}`,
+              name: 'OSCA Senior Citizen ID Card.pdf',
+              type: 'Senior Citizen OSCA ID Card',
+              size: '1.1 MB',
+            },
+          ];
+        }
+        return prev;
+      });
+    } else {
+      setIsSeniorCitizen(false);
+    }
+  }, [calculatedAge]);
 
   const handleGenerateOtp = () => {
     const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -50,7 +107,9 @@ export const AddUserModal = () => {
       const newFiles = Array.from(e.target.files).map((file, idx) => ({
         id: `doc_${Date.now()}_${idx}`,
         name: file.name,
-        type: file.name.toLowerCase().includes('id') ? 'ID Card (National ID / OSCA / Driver)' : 'Paper Document (Birth Certificate / Clearance)',
+        type: file.name.toLowerCase().includes('id')
+          ? 'ID Card (National ID / OSCA / Driver)'
+          : 'Paper Document (Birth Certificate / Clearance)',
         size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
       }));
       setAttachedDocs((prev) => [...prev, ...newFiles]);
@@ -78,6 +137,14 @@ export const AddUserModal = () => {
       email,
       role,
       otpCode,
+      birthDate,
+      citizenship,
+      civilStatus,
+      isSeniorCitizen,
+      isPwd,
+      isSoloParent,
+      employmentStatus,
+      monthlyIncome,
       documents: attachedDocs,
     });
 
@@ -87,6 +154,7 @@ export const AddUserModal = () => {
     setLastName('');
     setEmail('');
     setAttachedDocs([]);
+    setAddUserModalOpen(false);
   };
 
   return (
@@ -94,14 +162,14 @@ export const AddUserModal = () => {
       isOpen={addUserModalOpen}
       onClose={() => setAddUserModalOpen(false)}
       title="Add New User Account"
-      subtitle="Register user credentials, 6-char OTP passcode & upload verification documents"
-      maxWidth="max-w-2xl"
+      subtitle="Register citizen credentials, date of birth, citizenship & verification documents"
+      maxWidth="max-w-3xl"
     >
-      <form onSubmit={handleSubmit} className="space-y-6 select-none">
-        {/* 1. Name Fields */}
+      <form onSubmit={handleSubmit} className="space-y-6 select-none max-h-[80vh] overflow-y-auto pr-1">
+        {/* 1. Name & Account Role */}
         <div className="space-y-3">
           <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            1. Personal Details
+            1. Personal & Contact Information
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -171,22 +239,158 @@ export const AddUserModal = () => {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full bg-[#f8fafc] text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white"
               >
+                <option>Citizen User</option>
                 <option>System Admin</option>
                 <option>Content Moderator</option>
                 <option>Analyst</option>
                 <option>Agency Verifier</option>
-                <option>Citizen User</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* 2. 6-Character OTP Passcode Section */}
+        {/* 2. Demographic & Citizen Parameters for Intelligent Benefit Matching */}
+        <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-[#093a96] uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#093a96]" />
+              <span>2. Demographics & Citizen Matching Parameters</span>
+            </h4>
+            {calculatedAge !== null && (
+              <span
+                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  calculatedAge >= 60
+                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : 'bg-blue-100 text-blue-900 border-blue-200'
+                }`}
+              >
+                {calculatedAge >= 60 ? `Senior Citizen (${calculatedAge} yrs old)` : `Age: ${calculatedAge} yrs old`}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Date of Birth *
+              </label>
+              <input
+                type="date"
+                required
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                className="w-full bg-white text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3.5 py-2 outline-none border border-slate-200 focus:border-[#093a96]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Citizenship *
+              </label>
+              <select
+                value={citizenship}
+                onChange={(e) => setCitizenship(e.target.value)}
+                className="w-full bg-white text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 outline-none border border-slate-200 focus:border-[#093a96]"
+              >
+                <option value="Filipino">Filipino (Philippine Citizen)</option>
+                <option value="Dual Citizen">Dual Citizen (Filipino-Foreign)</option>
+                <option value="Permanent Resident">Permanent Resident</option>
+                <option value="Foreign National">Foreign National</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Civil Status
+              </label>
+              <select
+                value={civilStatus}
+                onChange={(e) => setCivilStatus(e.target.value)}
+                className="w-full bg-white text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 outline-none border border-slate-200 focus:border-[#093a96]"
+              >
+                <option value="Single">Single</option>
+                <option value="Married">Married</option>
+                <option value="Widowed">Widowed</option>
+                <option value="Separated">Separated / Divorced</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Employment Status
+              </label>
+              <select
+                value={employmentStatus}
+                onChange={(e) => setEmploymentStatus(e.target.value)}
+                className="w-full bg-white text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 outline-none border border-slate-200 focus:border-[#093a96]"
+              >
+                <option value="Employed">Employed (Private / Government)</option>
+                <option value="Self-Employed">Self-Employed / Micro-Entrepreneur</option>
+                <option value="Unemployed">Unemployed / Jobseeker</option>
+                <option value="Student">Student / Youth</option>
+                <option value="Retired">Retired / Pensioner</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Estimated Monthly Household Income
+              </label>
+              <select
+                value={monthlyIncome}
+                onChange={(e) => setMonthlyIncome(e.target.value)}
+                className="w-full bg-white text-slate-800 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 outline-none border border-slate-200 focus:border-[#093a96]"
+              >
+                <option value="Below ₱15,000 (Indigent/Low Income)">Below ₱15,000 (Indigent / 4Ps Eligible)</option>
+                <option value="₱15,000 - ₱30,000">₱15,000 - ₱30,000 (Lower Middle)</option>
+                <option value="₱30,000 - ₱60,000">₱30,000 - ₱60,000 (Middle Class)</option>
+                <option value="Above ₱60,000">Above ₱60,000 (Upper Middle)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Vulnerable Sector Checkboxes */}
+          <div className="pt-2 border-t border-indigo-100 flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-700">
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isSeniorCitizen}
+                onChange={(e) => setIsSeniorCitizen(e.target.checked)}
+                className="w-4 h-4 rounded text-[#093a96] focus:ring-0 cursor-pointer"
+              />
+              <span>Senior Citizen (Age 60+)</span>
+            </label>
+
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isPwd}
+                onChange={(e) => setIsPwd(e.target.checked)}
+                className="w-4 h-4 rounded text-[#093a96] focus:ring-0 cursor-pointer"
+              />
+              <span>Person with Disability (PWD)</span>
+            </label>
+
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isSoloParent}
+                onChange={(e) => setIsSoloParent(e.target.checked)}
+                className="w-4 h-4 rounded text-[#093a96] focus:ring-0 cursor-pointer"
+              />
+              <span>Solo Parent (RA 11861)</span>
+            </label>
+          </div>
+        </div>
+
+        {/* 3. 6-Character OTP Passcode Section */}
         <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-bold text-[#093a96]">
               <KeyRound className="w-4 h-4" />
-              <span>2. 6-Character Temporary OTP Password</span>
+              <span>3. 6-Character Temporary OTP Password</span>
             </div>
             <button
               type="button"
@@ -207,17 +411,17 @@ export const AddUserModal = () => {
               className="w-44 font-mono font-black text-center text-lg tracking-widest bg-white rounded-xl px-4 py-2 border border-blue-300 focus:border-[#093a96] outline-none text-[#093a96] shadow-xs"
             />
             <p className="text-[11px] text-slate-600 leading-snug">
-              User will be required to provide this 6-char OTP code upon first login to verify identity.
+              Citizen will provide this 6-char OTP code upon first login to verify identity.
             </p>
           </div>
         </div>
 
-        {/* 3. Unlimited ID Card & Paper Document Upload Section */}
+        {/* 4. Unlimited ID Card & Paper Document Upload Section */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <FileCheck className="w-3.5 h-3.5 text-[#093a96]" />
-              <span>3. Attached ID Cards & Paper-Based Documents ({attachedDocs.length})</span>
+              <span>4. Attached ID Cards & Paper-Based Documents ({attachedDocs.length})</span>
             </h4>
             <span className="text-[11px] text-slate-500">Upload as many as needed</span>
           </div>
@@ -239,7 +443,7 @@ export const AddUserModal = () => {
                 Click or drag ID cards & paper documents here
               </p>
               <p className="text-[10px] text-slate-500">
-                Supports multiple files: National ID, Passport, Birth Certificate, Barangay Clearance (PDF, JPG, PNG)
+                Supports multiple files: National ID, OSCA Senior ID, PWD ID, Birth Certificate (PDF, JPG, PNG)
               </p>
             </div>
           </div>
@@ -307,7 +511,7 @@ export const AddUserModal = () => {
             icon={UserPlus}
             className="!bg-[#141870] hover:!bg-[#0c1055] font-bold shadow-md shadow-blue-950/20"
           >
-            Create User Account & Save Documents
+            Create User Account & Save Profile
           </IOSButton>
         </div>
       </form>

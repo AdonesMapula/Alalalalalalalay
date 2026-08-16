@@ -25,6 +25,33 @@
   input, textarea, select {
     user-select: text;
   }
+
+  /* Global Custom Thin Blue Scrollbar (Standard & WebKit) */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #093a96 #f1f5f9;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #093a96;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    transition: background-color 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #072d75;
+  }
 }
 
 /* Custom shadow and card styling matching reference images */
@@ -57,6 +84,67 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Smooth Modals & AI Chat Transitions */
+@keyframes modalFadeIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes slideInSide {
+  0% {
+    opacity: 0;
+    transform: translateX(30px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes messageSmoothPop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes textStaggerFade {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-side-in {
+  animation: slideInSide 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-message-pop {
+  animation: messageSmoothPop 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-text-stagger {
+  animation: textStaggerFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes pulse-ring {

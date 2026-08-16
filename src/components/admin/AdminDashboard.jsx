@@ -52,9 +52,9 @@ export const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F5FB] flex flex-col md:flex-row select-none text-[#0f172a]">
-      {/* 1. Left Admin Sidebar matching reference image */}
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200/90 p-6 flex flex-col justify-between flex-shrink-0 min-h-screen">
+    <div className="h-screen bg-[#F4F5FB] flex flex-col md:flex-row select-none text-[#0f172a] overflow-hidden">
+      {/* 1. Left Admin Sidebar (Fixed, Non-Scrolling with page content) */}
+      <aside className="w-full md:w-64 bg-white border-r border-slate-200/90 p-6 flex flex-col justify-between flex-shrink-0 h-screen sticky top-0 z-30 overflow-y-auto">
         {/* Top Branding matching reference image */}
         <div className="space-y-8">
           <div className="flex items-center gap-3">
@@ -129,8 +129,8 @@ export const AdminDashboard = () => {
         </div>
       </aside>
 
-      {/* 2. Main Admin Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#F4F5FB]">
+      {/* 2. Main Admin Area (Independent Scroll Container) */}
+      <div className="flex-1 flex flex-col min-w-0 bg-[#F4F5FB] h-screen overflow-y-auto">
         {/* Top Header Bar matching reference image */}
         <header className="bg-white border-b border-slate-200/90 px-6 sm:px-10 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
           <h1 className="text-xl font-black text-[#093a96] tracking-tight">

@@ -16,6 +16,7 @@ import {
   ChevronRight,
   ArrowUpRight,
   Compass,
+  Maximize2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { askAlalayAI } from '../../services/geminiService';
@@ -364,19 +365,32 @@ export const AskAlalayChatModal = () => {
     opportunities,
     sources,
     documents,
+    loadedChatSession,
+    setLoadedChatSession,
+    saveChatArchive,
+    addToast,
   } = useApp();
 
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState('');
+  const [sessionTitle, setSessionTitle] = useState('');
   const messagesEndRef = useRef(null);
 
   const opp = askAlalayOpportunity;
 
-  // Initialize Greeting
+  // Initialize Greeting or Load Archived Session
   useEffect(() => {
     if (askAlalayOpen) {
-      if (opp) {
+      if (loadedChatSession && loadedChatSession.messages && loadedChatSession.messages.length > 0) {
+        setMessages(loadedChatSession.messages);
+        setCurrentSessionId(loadedChatSession.id);
+        setSessionTitle(loadedChatSession.title);
+      } else if (opp) {
+        const newId = `chat_${Date.now()}`;
+        setCurrentSessionId(newId);
+        setSessionTitle(`Consultation: ${opp.title}`);
         setMessages([
           {
             id: 'init_opp',
@@ -388,6 +402,9 @@ export const AskAlalayChatModal = () => {
           },
         ]);
       } else {
+        const newId = `chat_${Date.now()}`;
+        setCurrentSessionId(newId);
+        setSessionTitle('');
         setMessages([
           {
             id: 'init_gen',
@@ -399,7 +416,7 @@ export const AskAlalayChatModal = () => {
         ]);
       }
     }
-  }, [askAlalayOpen, opp, user?.firstName, opportunities]);
+  }, [askAlalayOpen, opp, loadedChatSession, user?.firstName, opportunities]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -436,10 +453,11 @@ export const AskAlalayChatModal = () => {
       id: `usr_${Date.now()}`,
       sender: 'user',
       text,
-      time: 'Just now',
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const updatedMsgList = [...messages, userMsg];
+    setMessages(updatedMsgList);
     setInputValue('');
     setIsTyping(true);
 
@@ -459,31 +477,62 @@ export const AskAlalayChatModal = () => {
         id: `ai_${Date.now()}`,
         sender: 'ai',
         text: replyText,
-        time: 'Just now',
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         sourceUrl: opp?.officialSource?.url || 'https://www.gov.ph',
         matchedOpportunities: matchedOpps,
       };
-      setMessages((prev) => [...prev, aiMsg]);
+
+      const finalMessages = [...updatedMsgList, aiMsg];
+      setMessages(finalMessages);
+
+      // Auto-save consultation to Chat Archives
+      if (saveChatArchive) {
+        const titleToUse =
+          sessionTitle ||
+          (opp
+            ? `Consultation: ${opp.title}`
+            : `Inquiry: ${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`);
+
+        setSessionTitle(titleToUse);
+
+        saveChatArchive({
+          id: currentSessionId || `chat_${Date.now()}`,
+          title: titleToUse,
+          category: opp?.categoryName || (text.toLowerCase().includes('loan') ? 'Finance' : text.toLowerCase().includes('job') ? 'Employment' : text.toLowerCase().includes('health') ? 'Health' : 'Public Service'),
+          categoryColor: opp?.categoryColor || '#093a96',
+          timestamp: new Date().toISOString(),
+          dateFormatted:
+            new Date().toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            }) +
+            ' • ' +
+            new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+          preview: replyText.replace(/[#*•]/g, '').slice(0, 140) + '...',
+          messageCount: finalMessages.length,
+          sourceUrl: opp?.officialSource?.url || 'https://www.gov.ph',
+          messages: finalMessages,
+        });
+      }
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `ai_${Date.now()}`,
-          sender: 'ai',
-          text: 'ALALAY is grounded in verified Citizen Charters. Please check with your nearest government agency branch or hospital Malasakit Center desk.',
-          time: 'Just now',
-          matchedOpportunities: [],
-        },
-      ]);
+      const aiErrMsg = {
+        id: `ai_${Date.now()}`,
+        sender: 'ai',
+        text: 'ALALAY is grounded in verified Citizen Charters. Please check with your nearest government agency branch or hospital Malasakit Center desk.',
+        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        matchedOpportunities: [],
+      };
+      setMessages((prev) => [...prev, aiErrMsg]);
     } finally {
       setIsTyping(false);
     }
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-full max-w-sm sm:max-w-md bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden select-none animate-in slide-in-from-bottom-5 duration-200">
+    <div className="fixed bottom-6 right-6 z-50 w-[92vw] sm:w-[420px] max-w-[440px] h-[540px] max-h-[85vh] bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden select-none animate-in slide-in-from-bottom-5 duration-200 flex flex-col">
       {/* Top Header */}
-      <div className="bg-[#093a96] text-white px-5 py-3.5 flex items-center justify-between">
+      <div className="bg-[#093a96] text-white px-5 py-3.5 flex items-center justify-between flex-shrink-0 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-white p-1 flex items-center justify-center flex-shrink-0 shadow-sm">
             <img
@@ -501,17 +550,40 @@ export const AskAlalayChatModal = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setAskAlalayOpen(false)}
-          className="p-1 rounded-full text-white/80 hover:text-white hover:bg-white/10 cursor-pointer"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              if (setLoadedChatSession) {
+                setLoadedChatSession({
+                  id: currentSessionId || `session_page_${Date.now()}`,
+                  title: sessionTitle || (opp ? `Consultation: ${opp.title}` : 'Citizen AI Consultation'),
+                  messages: messages,
+                });
+              }
+              setAskAlalayOpen(false);
+              setActiveTab('ai-chat');
+              addToast('Expanded to Full Page', 'Consultation opened in dedicated workspace.', 'info');
+            }}
+            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 cursor-pointer transition-colors"
+            title="Open in Dedicated Full-Page Workspace"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAskAlalayOpen(false)}
+            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 cursor-pointer transition-colors"
+            title="Close Chat"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Chat Conversation Body */}
-      <div className="p-4 h-80 overflow-y-auto space-y-3 bg-[#f8fafd] text-xs">
+      {/* Chat Conversation Body (Scrolls smoothly) */}
+      <div className="p-4 flex-1 min-h-0 overflow-y-auto space-y-3 bg-[#f8fafd] text-xs">
         {messages.map((msg) => {
           const isAi = msg.sender === 'ai';
           return (
@@ -563,14 +635,14 @@ export const AskAlalayChatModal = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Quick Questions Pills (Clean Citizen Program Queries) */}
-      <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar">
+      {/* Suggested Quick Questions Pills (Clean horizontal bar) */}
+      <div className="px-3 py-2 bg-slate-50/90 border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
         {quickPills.map((pill, idx) => (
           <button
             key={idx}
             type="button"
             onClick={() => handleSendMessage(pill)}
-            className="flex-shrink-0 px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-[11px] font-semibold text-[#093a96] transition-all cursor-pointer shadow-2xs"
+            className="flex-shrink-0 px-2.5 py-1 rounded-full bg-white border border-slate-200 text-[10px] font-bold text-[#093a96] hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-2xs"
           >
             {pill}
           </button>
@@ -583,14 +655,14 @@ export const AskAlalayChatModal = () => {
           e.preventDefault();
           handleSendMessage();
         }}
-        className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+        className="p-2.5 sm:p-3 bg-white border-t border-slate-200/90 flex items-center gap-2 flex-shrink-0 shadow-sm"
       >
         <input
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Ask a question about government assistance, loans..."
-          className="flex-1 bg-slate-100 text-slate-800 text-xs rounded-full px-4 py-2.5 outline-none border border-transparent focus:border-[#093a96] focus:bg-white transition-all font-medium"
+          placeholder="Ask about government assistance, loans..."
+          className="flex-1 bg-slate-50 text-slate-800 text-xs rounded-full px-4 py-2.5 outline-none border border-slate-200 focus:border-[#093a96] focus:bg-white transition-all font-medium"
         />
 
         <button
@@ -598,7 +670,7 @@ export const AskAlalayChatModal = () => {
           disabled={!inputValue.trim() || isTyping}
           className="w-9 h-9 rounded-full bg-[#093a96] disabled:bg-slate-300 text-white flex items-center justify-center cursor-pointer transition-all hover:bg-[#072d75] flex-shrink-0 shadow-xs"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-3.5 h-3.5" />
         </button>
       </form>
     </div>

@@ -18,12 +18,13 @@ import {
   Gift,
   ListOrdered,
   Users,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSButton } from '../common/IOSButton';
 
 export const SourceDetailsModal = ({ source, onClose, onRescrape, isScraping }) => {
-  const { opportunities } = useApp();
+  const { opportunities, removeKnowledgeSource } = useApp();
   const [activeTab, setActiveTab] = useState('opportunities');
 
   if (!source) return null;
@@ -209,7 +210,14 @@ export const SourceDetailsModal = ({ source, onClose, onRescrape, isScraping }) 
                             How to Avail & Claim:
                           </span>
                           <span className="text-[11px] text-slate-600 leading-snug">
-                            Submit verified documents to your nearest {opp.agency} branch office or hospital Malasakit Center desk with your PhilSys National ID.
+                            {opp.howToAvail ||
+                              (opp.agency?.toLowerCase().includes('job') || opp.agency?.toLowerCase().includes('dole')
+                                ? 'Register online or apply directly through your local City/Municipal Public Employment Service Office (PESO).'
+                                : opp.agency?.toLowerCase().includes('deped') || opp.agency?.toLowerCase().includes('ched') || opp.agency?.toLowerCase().includes('unifast')
+                                ? 'Apply online through the official education portal or submit credentials to your school Registrar / SFAO.'
+                                : opp.agency?.toLowerCase().includes('sss') || opp.agency?.toLowerCase().includes('pag-ibig')
+                                ? 'Submit application online via official member portal or visit your nearest branch office.'
+                                : `Submit verified documents to your nearest ${opp.agency} branch office or hospital Malasakit Center desk with your PhilSys National ID.`)}
                           </span>
                         </div>
                       </div>
@@ -324,18 +332,39 @@ export const SourceDetailsModal = ({ source, onClose, onRescrape, isScraping }) 
         </div>
 
         {/* Modal Footer Actions */}
-        <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between">
-          <a
-            href={rawUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-[#093a96] hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 cursor-pointer border border-slate-200"
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>Visit Portal</span>
-          </a>
-
+        <div className="px-6 py-4 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
+            <a
+              href={rawUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-[#093a96] hover:bg-slate-50 transition-colors inline-flex items-center gap-1.5 cursor-pointer border border-slate-200"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>Visit Portal</span>
+            </a>
+
+            <button
+              type="button"
+              onClick={() => {
+                const name = source.name || rawUrl || 'this website';
+                if (
+                  window.confirm(
+                    `Delete "${name}"?\n\nThis will permanently remove this website and purge all associated scraped opportunities and job vacancies.`
+                  )
+                ) {
+                  removeKnowledgeSource(source.id);
+                  onClose();
+                }
+              }}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Website & Scraped Data</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 justify-end">
             <IOSButton
               variant="secondary"
               size="sm"

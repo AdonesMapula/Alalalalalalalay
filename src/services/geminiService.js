@@ -315,12 +315,19 @@ function generateStructuredGroundedAnswer(cleanQ, options = {}) {
     return (
       `Here are the legitimate Philippine government loan and emergency financial assistance programs categorized by your citizen profile:\n\n` +
       `💼 If you are an Employed Worker or Contributing Member:\n` +
-      `1. SSS Salary & Calamity Loan (Social Security System)\n` +
-      `• Loan Amount: Up to 1 to 2 months average salary\n` +
-      `• Terms: 10% annual interest, 24-month repayment period\n` +
-      `• Requirements: Active member with at least 36 monthly contributions, UMID/PhilSys ID\n` +
+      `1. SSS Calamity Loan Assistance Program (CLAP)\n` +
+      `• Loan Amount: Equivalent to average of 12 latest posted Monthly Salary Credits (MSCs)\n` +
+      `• Interest Rate Matrix:\n` +
+      `  - Initial Applications & Renewals without penalty condonation for past 5 years: 7% interest per annum (Annual EIR: 7.10% - 8.17%)\n` +
+      `  - Renewals with previous penalty condonation within past 5 years: 10% interest per annum (Annual EIR: 9.88% - 11.46%)\n` +
+      `• Repayment Term: 24 equal monthly installments with instant My.SSS online disbursement\n` +
+      `• Requirements: At least 36 posted monthly contributions (6 within last 12 months), Barangay Calamity Certification, UMID/PhilSys ID\n` +
       `• Official Portal: https://www.sss.gov.ph\n\n` +
-      `2. Pag-IBIG Multi-Purpose Cash Loan (HDMF MPL)\n` +
+      `2. SSS Salary Loan Program\n` +
+      `• Loan Amount: 1 to 2 months average basic salary credit\n` +
+      `• Interest: 10% annual interest rate computed on diminishing principal balance\n` +
+      `• Official Portal: https://www.sss.gov.ph\n\n` +
+      `3. Pag-IBIG Multi-Purpose Cash Loan (HDMF MPL)\n` +
       `• Loan Amount: Up to 80% of your total accumulated Pag-IBIG savings\n` +
       `• Terms: 10.5% p.a. interest, 24 to 36 month repayment period\n` +
       `• Requirements: At least 24 monthly contributions, valid government photo ID\n` +
@@ -444,19 +451,25 @@ export async function askAlalayAI(userQuestion, options = {}) {
   const ragContext = buildGroundingContext(userQuestion, contextOptions);
 
   const systemPrompt =
-    'You are ALALAY, an empathetic, highly structured AI government and healthcare assistance navigator in the Philippines. ' +
-    'Answer questions accurately using ONLY the retrieved real-time knowledge base provided below. ' +
-    'STRICT RAG SAFETY & ANTI-SCAM GUARDRAILS:\n' +
-    '1. NEVER hallucinate non-existent government programs, loans, or unofficial social media links.\n' +
-    '2. Format responses clearly segmented by Citizen Persona:\n' +
-    '   - "💼 If you are an Employed Worker / Member:" (SSS Salary Loan, Pag-IBIG MPL)\n' +
-    '   - "🤝 If you are an Indigent Citizen / Family in Crisis:" (DSWD AICS Emergency Cash Grant)\n' +
-    '   - "🎓 If you are an Enrolled College Student:" (UniFAST Tertiary Education Subsidy via School Registrar)\n' +
-    '   - "👴 If you are a Senior Citizen (Age 60+):" (PhilHealth Automatic Hospitalization Coverage RA 10645)\n' +
-    '   - "👷 If you are a Displaced / Informal Worker:" (DOLE TUPAD Emergency Wage Employment)\n' +
-    '3. Format with clean bullet points (• ), numbered steps (1., 2.), checklist tags (✓ Met / ✗ Missing), and Philippine Peso (₱). NO markdown asterisks (**).\n' +
-    '4. Always include an Anti-Scam Advisory warning citizens that official government grants are 100% free.\n' +
-    '5. Always end with the verified official source reference URL (.gov.ph) from the retrieved chunks.\n' +
+    'You are ALALAY, a highly analytical Closed-Domain Opportunity Extraction and Validation Engine and government assistant in the Philippines.\n' +
+    'Evaluate all citizen queries strictly against verified official admin-provided core agency web text.\n' +
+    'STRICT ADMINISTRATIVE ENFORCEMENT & EMBEDDED BENCHMARKS:\n' +
+    '1. NO OPEN-INTERNET BROWSING OR FABRICATIONS: Strictly ground responses in the provided verified .gov.ph contexts (ched.gov.ph, unifast.gov.ph, sss.gov.ph, philhealth.gov.ph, doh.gov.ph, dole.gov.ph).\n' +
+    '2. CROSS-SECTOR BRACKET EXTRACTION & ANTI-FLATTENING:\n' +
+    '   - Public sector metrics are heavily gated by tiered rules. Never isolate a metric without binding it directly to its mandatory qualifier condition.\n' +
+    '   - For SSS Calamity Loans: Initial applications & renewals without penalty condonation for the past 5 years = 7% interest per annum (EIR: 7.10% - 8.17%). Renewals with previous penalty condonation within past 5 years = 10% interest per annum (EIR: 9.88% - 11.46%).\n' +
+    '   - For SSS Salary Loans: 10% annual interest rate.\n' +
+    '   - For Pag-IBIG Multi-Purpose Loans: 10.5% annual interest up to 80% of accumulated savings.\n' +
+    '   - For UniFAST / CHED: Subsidies are applied through official campus Registrar/SFAO and unifast.gov.ph, never third-party links.\n' +
+    '3. SEGMENT BY CITIZEN PERSONA:\n' +
+    '   - "💼 If you are an Employed Worker / Member:"\n' +
+    '   - "🤝 If you are an Indigent Citizen / Family in Crisis:"\n' +
+    '   - "🎓 If you are an Enrolled College Student:"\n' +
+    '   - "👴 If you are a Senior Citizen (Age 60+):"\n' +
+    '   - "👷 If you are a Displaced / Informal Worker:"\n' +
+    '4. Clean visual formatting: Bullet points (• ), numbered steps (1., 2.), checklist tags (✓ Met / ✗ Missing), Philippine Peso (₱). NO markdown asterisks (**).\n' +
+    '5. Anti-Scam Advisory: Official government grants and application forms are 100% free.\n' +
+    '6. Always end with verified official source reference URLs.\n' +
     getDictionaryContext() +
     ragContext;
 
@@ -466,8 +479,7 @@ export async function askAlalayAI(userQuestion, options = {}) {
     return generateStructuredGroundedAnswer(cleanQ, contextOptions);
   }
 
-  // 3. Call Google Gemini API (gemini-1.5-flash / gemini-1.5-pro / gemini-2.0-flash)
-  const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash'];
+  const models = (['gemini-3.6-flash']);
 
   for (const model of models) {
     try {

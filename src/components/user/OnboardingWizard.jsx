@@ -22,7 +22,7 @@ import { EgovVerifiedBadge } from '../common/IOSBadge';
 import { useApp } from '../../context/AppContext';
 
 export const OnboardingWizard = ({ onCancel }) => {
-  const { user, setUser, completeOnboardingWizard, logout } = useApp();
+  const { user, setUser, updateUserProfile, completeOnboardingWizard, logout } = useApp();
 
   // Wizard Steps:
   // 1: Identity Form (Personal Details auto-filled from Admin)
@@ -81,10 +81,9 @@ export const OnboardingWizard = ({ onCancel }) => {
   // Retrieve ONLY the documents saved by Super Admin for this user (NO hardcoded fallback)
   const adminSavedDocs = (user?.documents && user.documents.length > 0) ? user.documents : [];
 
-  const handleStep1Submit = (e) => {
+  const handleStep1Submit = async (e) => {
     e.preventDefault();
-    setUser((prev) => ({
-      ...prev,
+    const updatedProfile = {
       firstName,
       lastName,
       middleName,
@@ -92,12 +91,23 @@ export const OnboardingWizard = ({ onCancel }) => {
       email,
       phone: mobileNumber,
       address: currentAddress,
-    }));
+    };
+
+    // Immediately persist updated mobile phone and address to Supabase & state
+    await updateUserProfile(updatedProfile);
     setStep(2);
   };
 
   const handleFinishOnboarding = () => {
-    completeOnboardingWizard(adminSavedDocs);
+    completeOnboardingWizard(adminSavedDocs, {
+      firstName,
+      lastName,
+      middleName,
+      fullName: `${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`.trim(),
+      email,
+      phone: mobileNumber,
+      address: currentAddress,
+    });
   };
 
   return (

@@ -13,7 +13,7 @@ export const Header = () => {
   } = useApp();
 
   return (
-    <header className="px-6 sm:px-10 pt-8 pb-4 flex items-center justify-between gap-4 select-none">
+    <header className="px-6 sm:px-10 pt-5 pb-3 flex items-center justify-between gap-4 select-none flex-shrink-0">
       {/* Greeting Title matching Image 3 */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-[#0f172a] tracking-tight">
