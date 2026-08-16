@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   LogOut,
   Sparkles,
+  ClipboardList,
 } from 'lucide-react';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { useApp } from '../../context/AppContext';
@@ -30,7 +31,7 @@ export const Sidebar = () => {
   const citizenNav = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'explore', label: 'Explore', icon: Compass },
-    // { id: 'ai-chat', label: 'ALALAY AI Chat', icon: Sparkles },
+    { id: 'apply', label: 'Apply with AI', icon: ClipboardList, isNew: true },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'chat-history', label: 'Chat Archives', icon: MessageSquare },
     { id: 'profile', label: 'Profile', icon: User },
@@ -68,7 +69,12 @@ export const Sidebar = () => {
                     }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                  <span>{item.label}</span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.isNew && !isActive && (
+                    <span className="text-[9px] font-extrabold bg-gradient-to-r from-violet-500 to-indigo-500 text-white px-1.5 py-0.5 rounded-full">
+                      NEW
+                    </span>
+                  )}
                 </button>
               );
             })

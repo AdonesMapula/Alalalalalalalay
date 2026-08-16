@@ -469,6 +469,7 @@ export const AskAlalayChatModal = () => {
         opportunities,
         sources,
         userDocs: documents,
+        conversationHistory: messages,
       });
 
       const matchedOpps = findMatchingOpportunities(replyText + ' ' + text, opportunities);

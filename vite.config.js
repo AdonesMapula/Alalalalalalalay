@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
@@ -56,11 +56,147 @@ function liveScraperProxyPlugin() {
   };
 }
 
+/**
+ * Server-side Gemini AI Chat Proxy Middleware
+ * Securely calls Google Gemini API without exposing API keys or tokens to client-side bundles.
+ */
+function alalayChatProxyPlugin() {
+  const env = loadEnv('development', process.cwd(), '');
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    env.GEMINI_API_KEY ||
+    env.VITE_GEMINI_API ||
+    env.EXPO_PUBLIC_GEMINI_API ||
+    '';
+  const reserveKey =
+    process.env.GEMINI_API_KEY_RESERVE ||
+    env.GEMINI_API_KEY_RESERVE ||
+    env.VITE_GEMINI_API_RESERVE ||
+    env.EXPO_PUBLIC_GEMINI_API_RESERVE ||
+    '';
+
+  const models = [
+    'gemini-3.6-flash',
+    'gemini-3.5-flash',
+    'gemini-flash-latest',
+    'gemini-3-flash-preview',
+    'gemini-3.7-flash',
+  ];
+
+  return {
+    name: 'alalay-chat-proxy',
+    configureServer(server) {
+      server.middlewares.use('/api/alalay/chat', async (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+          return;
+        }
+
+        try {
+          let bodyStr = '';
+          for await (const chunk of req) {
+            bodyStr += chunk;
+          }
+
+          const { systemPrompt, userInstruction, temperature = 0.1, maxOutputTokens = 1400 } =
+            JSON.parse(bodyStr || '{}');
+
+          let activeKey = apiKey || reserveKey;
+          if (!activeKey) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: 'Gemini API Key is not configured on the server.' }));
+            return;
+          }
+
+          let lastError = null;
+
+          for (const model of models) {
+            try {
+              const isOAuthToken = activeKey.startsWith('ya29.');
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent${
+                isOAuthToken ? '' : `?key=${activeKey}`
+              }`;
+
+              const headers = {
+                'Content-Type': 'application/json',
+              };
+
+              if (isOAuthToken) {
+                headers['Authorization'] = `Bearer ${activeKey}`;
+              } else {
+                headers['x-goog-api-key'] = activeKey;
+              }
+
+              const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  contents: [
+                    {
+                      role: 'user',
+                      parts: [{ text: `${systemPrompt}\n\n${userInstruction}` }],
+                    },
+                  ],
+                  generationConfig: {
+                    temperature,
+                    maxOutputTokens,
+                  },
+                }),
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                const rawText =
+                  data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+
+                if (rawText.trim().length > 0) {
+                  res.statusCode = 200;
+                  res.end(JSON.stringify({ success: true, text: rawText }));
+                  return;
+                }
+              }
+
+              if (response.status === 429 && reserveKey && activeKey !== reserveKey) {
+                activeKey = reserveKey;
+              }
+
+              const errData = await response.json().catch(() => ({}));
+              lastError = errData.error?.message || `HTTP ${response.status}`;
+            } catch (err) {
+              lastError = err.message;
+            }
+          }
+
+          res.statusCode = 502;
+          res.end(JSON.stringify({ success: false, error: lastError || 'All models failed.' }));
+        } catch (err) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ success: false, error: err.message || 'Internal Server Error' }));
+        }
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  envPrefix: ['VITE_', 'EXPO_PUBLIC_'],
   plugins: [
     react(),
     tailwindcss(),
     liveScraperProxyPlugin(),
+    alalayChatProxyPlugin(),
   ],
 });

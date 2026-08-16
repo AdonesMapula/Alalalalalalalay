@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Compass, Sparkles, MessageSquare, FolderLock, User, Bell } from 'lucide-react';
+import { Home, Compass, Sparkles, MessageSquare, FolderLock, ClipboardList } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
 export const BottomTabBar = () => {
@@ -9,7 +9,7 @@ export const BottomTabBar = () => {
     { id: 'home', label: 'Home', icon: Home },
     { id: 'explore', label: 'Explore', icon: Compass },
     { id: 'assistant', label: 'ALALAY', icon: Sparkles, isAi: true },
-    { id: 'chat-history', label: 'Archives', icon: MessageSquare },
+    { id: 'apply', label: 'Apply', icon: ClipboardList },
     { id: 'documents', label: 'Docs', icon: FolderLock },
   ];
 

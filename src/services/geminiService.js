@@ -101,435 +101,799 @@ class GeminiApiLimiter {
 const limiter = new GeminiApiLimiter();
 
 /**
- * RAG Semantic & Lexical Knowledge Retriever
- * Dynamically queries all scraped databases, opportunities, and sources for the most relevant context chunks
+ * ALALAY SMART RAG SERVICE
+ *
+ * Design goals:
+ * 1. Retrieve by topic + question intent, not by one shared keyword such as
+ *    "loan" or "student".
+ * 2. Let Gemini decide what the citizen is actually asking for.
+ * 3. Use verified scraped data when it directly answers the question.
+ * 4. Use Gemini's general Philippine-government knowledge for normal questions
+ *    that are outside the scraped program database (for example Barangay Clearance).
+ * 5. Never let an unrelated RAG chunk override a general question.
+ * 6. Do not force the model to answer with information that is not supported.
+ */
+
+const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'what', 'which', 'where',
+  'when', 'how', 'can', 'could', 'would', 'should', 'are', 'is', 'do', 'does',
+  'did', 'get', 'got', 'give', 'tell', 'please', 'about', 'into', 'your',
+  'you', 'my', 'me', 'our', 'their', 'they', 'them', 'a', 'an', 'to', 'of',
+  'in', 'on', 'at', 'or', 'as', 'be', 'it', 'its', 'i', 'am', 'we', 'us',
+  'na', 'ng', 'ang', 'mga', 'para', 'sa', 'ito', 'iyon', 'ako', 'ko', 'mo',
+  'saan', 'paano', 'ano', 'may', 'meron', 'pwede', 'po', 'ba', 'yung', 'kung',
+]);
+
+const QUESTION_INTENTS = {
+  LIST: 'list_available_options',
+  REQUIREMENTS: 'requirements',
+  ELIGIBILITY: 'eligibility',
+  APPLICATION: 'application_process',
+  LOCATION: 'location_or_office',
+  BENEFITS: 'benefits_or_coverage',
+  FEES: 'fees_or_cost',
+  PROCESSING: 'processing_time_or_status',
+  DOCUMENTS: 'documents',
+  GENERAL: 'general_information',
+};
+
+function normalizeText(text = '') {
+  return String(text)
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9áéíóúñü₱\s-]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tokenize(text = '') {
+  return normalizeText(text)
+    .split(/\s+/)
+    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+}
+
+function includesAny(text, phrases = []) {
+  const q = normalizeText(text);
+  return phrases.some((phrase) => q.includes(normalizeText(phrase)));
+}
+
+/**
+ * Understand the shape of the question before retrieving documents.
+ * This is intentionally deterministic and cheap. Gemini then gets the final
+ * semantic interpretation instructions as well.
+ */
+export function analyzeQuestion(userQuery = '', conversationHistory = []) {
+  const q = normalizeText(userQuery);
+  const tokens = tokenize(q);
+  const recent = Array.isArray(conversationHistory)
+    ? conversationHistory.slice(-6).map((m) => {
+      if (typeof m === 'string') return m;
+      return m?.content || m?.text || '';
+    }).filter(Boolean)
+    : [];
+
+  const combinedForReference = [...recent, userQuery].join(' ');
+
+  let intent = QUESTION_INTENTS.GENERAL;
+  let confidence = 0.55;
+
+  if (includesAny(q, [
+    'requirements', 'requirement', 'what do i need', 'what do i need to bring',
+    'documents needed', 'documents required', 'papers needed', 'needed to apply',
+    'ano ang requirements', 'anong requirements', 'ano kailangan', 'mga kailangan',
+    'requirements to get', 'requirements for',
+  ])) {
+    intent = QUESTION_INTENTS.REQUIREMENTS;
+    confidence = 0.98;
+  } else if (includesAny(q, [
+    'am i eligible', 'eligible', 'qualify', 'qualified', 'who can apply',
+    'who qualifies', 'can i apply', 'pasok ba ako', 'pwede ba ako',
+    'sino ang qualified', 'sino ang eligible',
+  ])) {
+    intent = QUESTION_INTENTS.ELIGIBILITY;
+    confidence = 0.97;
+  } else if (includesAny(q, [
+    'how to apply', 'how do i apply', 'how can i apply', 'how to get',
+    'how do i get', 'how can i get', 'steps', 'step by step', 'process of getting',
+    'process to apply', 'application process', 'paano kumuha', 'paano mag apply',
+    'paano mag-apply', 'paano makakuha', 'saan kumuha', 'where can i get',
+  ])) {
+    intent = QUESTION_INTENTS.APPLICATION;
+    confidence = 0.96;
+  } else if (includesAny(q, [
+    'how much', 'fee', 'fees', 'cost', 'price', 'magkano', 'bayad', 'magkano ang',
+  ])) {
+    intent = QUESTION_INTENTS.FEES;
+    confidence = 0.96;
+  } else if (includesAny(q, [
+    'how long', 'processing time', 'when will', 'when can i get', 'release',
+    'gaano katagal', 'kailan makukuha', 'status', 'pending',
+  ])) {
+    intent = QUESTION_INTENTS.PROCESSING;
+    confidence = 0.95;
+  } else if (includesAny(q, [
+    'where is', 'where can i apply', 'where do i apply', 'nearest', 'office',
+    'branch', 'location', 'address', 'saan pwede', 'saan mag apply', 'saan ako pupunta',
+  ])) {
+    intent = QUESTION_INTENTS.LOCATION;
+    confidence = 0.94;
+  } else if (includesAny(q, [
+    'what benefits', 'benefits', 'what do i get', 'what assistance', 'how much assistance',
+    'covered', 'coverage', 'entitlement', 'ano ang benefit', 'ano makukuha',
+  ])) {
+    intent = QUESTION_INTENTS.BENEFITS;
+    confidence = 0.94;
+  } else if (includesAny(q, [
+    'what loans', 'which loans', 'available loans', 'loans available',
+    'what programs', 'which programs', 'available programs', 'what assistance is available',
+    'what grants', 'which grants', 'ano ang mga loan', 'anong loan', 'anong programa',
+    'mga available', 'what options', 'which options',
+  ])) {
+    intent = QUESTION_INTENTS.LIST;
+    confidence = 0.95;
+  } else if (includesAny(q, [
+    'what documents', 'which documents', 'document', 'documents', 'id needed',
+    'valid id', 'anong dokumento', 'anong id',
+  ])) {
+    intent = QUESTION_INTENTS.DOCUMENTS;
+    confidence = 0.88;
+  }
+
+  // Detect the main topic separately from the requested information.
+  // This is the key difference from the old implementation: "loan" and
+  // "student" are topic signals, not the answer itself.
+  const topicKeywords = [];
+  const topicGroups = [
+    ['loan', 'loans', 'pautang', 'utang', 'salary loan', 'calamity loan', 'multi purpose loan'],
+    ['student', 'students', 'tuition', 'scholarship', 'school', 'education', 'tes', 'spes'],
+    ['senior', 'elderly', 'osca', 'pension'],
+    ['medical', 'hospital', 'medicine', 'malasakit', 'doh', 'health'],
+    ['job', 'work', 'employment', 'trabaho', 'dole', 'tupad'],
+    ['sss'],
+    ['philhealth'],
+    ['dswd', 'aics'],
+    ['pag-ibig', 'pagibig', 'hdmf'],
+    ['ched', 'unifast'],
+    ['tesda'],
+    ['barangay clearance', 'barangay certificate', 'barangay'],
+    ['nbi clearance', 'nbi'],
+    ['police clearance', 'police'],
+    ['birth certificate', 'psa'],
+    ['passport', 'dfa'],
+    ['driver license', 'drivers license', 'lto'],
+    ['tin', 'bir'],
+  ];
+
+  topicGroups.forEach((group) => {
+    if (group.some((term) => q.includes(normalizeText(term)))) {
+      topicKeywords.push(group[0]);
+    }
+  });
+
+  // If a follow-up uses "it/the loan/that program", preserve a small amount
+  // of previous context without allowing history to replace the current question.
+  const isFollowUp = includesAny(q, [
+    'it', 'that', 'this', 'the loan', 'the program', 'that loan', 'that program',
+    'those', 'them', 'same program', 'yung loan', 'yung program',
+  ]) && recent.length > 0;
+
+  return {
+    intent,
+    confidence,
+    topicKeywords,
+    queryTokens: tokens,
+    isFollowUp,
+    conversationContext: combinedForReference,
+    originalQuestion: userQuery,
+  };
+}
+
+function getOpportunityText(item = {}) {
+  return [
+    item.title,
+    item.agency,
+    item.categoryName,
+    item.category,
+    item.shortDesc,
+    item.fullDesc,
+    ...(item.benefits || []),
+    ...(item.requirements || []).map((r) => (typeof r === 'string' ? r : r?.name || '')),
+    item.eligibility,
+    item.qualification,
+    item.applicationProcess,
+    item.process,
+    item.fees,
+    item.processingTime,
+  ].filter(Boolean).join(' ');
+}
+
+function scoreTextOverlap(queryTokens, itemText) {
+  if (!queryTokens.length) return 0;
+  const text = normalizeText(itemText);
+  const matched = queryTokens.filter((token) => text.includes(token));
+  return Math.min(24, matched.length * 3);
+}
+
+function scoreIntent(intent, item = {}) {
+  const requirements = (item.requirements || []).length > 0 || !!item.requirements;
+  const benefits = (item.benefits || []).length > 0 || !!item.benefits;
+  const process = !!(item.applicationProcess || item.process || item.howToApply);
+  const eligibility = !!(item.eligibility || item.qualification || item.qualifications);
+  const fees = !!item.fees;
+  const processing = !!item.processingTime;
+
+  switch (intent) {
+    case QUESTION_INTENTS.REQUIREMENTS:
+    case QUESTION_INTENTS.DOCUMENTS:
+      return requirements ? 22 : -6;
+    case QUESTION_INTENTS.BENEFITS:
+      return benefits ? 22 : -4;
+    case QUESTION_INTENTS.APPLICATION:
+      return process ? 22 : 0;
+    case QUESTION_INTENTS.ELIGIBILITY:
+      return eligibility ? 22 : -4;
+    case QUESTION_INTENTS.FEES:
+      return fees ? 22 : -3;
+    case QUESTION_INTENTS.PROCESSING:
+      return processing ? 22 : -3;
+    case QUESTION_INTENTS.LIST:
+      return 8;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Smart RAG retriever.
+ *
+ * It still works with the existing in-memory scraped data structure, but it
+ * now scores the requested intent separately from the topic. This prevents
+ * "loan + student" from being treated as the entire question.
  */
 export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
-  const { opportunities = [], sources = [], opp = null } = database;
-  const q = userQuery.toLowerCase().trim();
-  const queryTokens = q.split(/\s+/).filter((w) => w.length > 2);
-
+  const { opportunities = [], sources = [], opp = null, conversationHistory = [] } = database;
+  const plan = analyzeQuestion(userQuery, conversationHistory);
+  const q = normalizeText(userQuery);
   const scoredChunks = [];
 
-  // If citizen is currently inspecting a specific opportunity card, prioritize it with highest weight
   if (opp) {
     scoredChunks.push({
       score: 100,
+      relevance: 'explicit-current-opportunity',
       title: opp.title,
       agency: opp.agency,
       category: opp.categoryName || opp.category,
-      content: `Target Program: ${opp.title} (${opp.agency}). ${opp.fullDesc || opp.shortDesc}. Benefits: ${(opp.benefits || []).join(', ')}. Requirements: ${(opp.requirements || []).map((r) => (typeof r === 'string' ? r : r.name)).join(', ')}.`,
-      sourceUrl: opp.officialSource?.url || 'https://www.gov.ph',
+      content: `Target Program: ${opp.title} (${opp.agency}). ${opp.fullDesc || opp.shortDesc || ''}. Benefits: ${(opp.benefits || []).join(', ')}. Requirements: ${(opp.requirements || []).map((r) => (typeof r === 'string' ? r : r?.name || '')).join(', ')}.`,
+      sourceUrl: opp.officialSource?.url || '',
+      rawItem: opp,
     });
   }
 
-  // 1. Score and retrieve relevant scraped opportunities from database
   opportunities.forEach((item) => {
     if (opp && opp.id === item.id) return;
 
-    const itemText = (
-      item.title +
-      ' ' +
-      item.agency +
-      ' ' +
-      (item.categoryName || item.category || '') +
-      ' ' +
-      (item.shortDesc || '') +
-      ' ' +
-      (item.fullDesc || '') +
-      ' ' +
-      (item.benefits || []).join(' ') +
-      ' ' +
-      (item.requirements || []).map((r) => (typeof r === 'string' ? r : r.name)).join(' ')
-    ).toLowerCase();
-
+    const itemText = getOpportunityText(item);
+    const normalizedItem = normalizeText(itemText);
     let score = 0;
 
-    if (q.includes(item.title.toLowerCase()) || itemText.includes(q)) {
-      score += 30;
-    }
-
-    queryTokens.forEach((token) => {
-      if (itemText.includes(token)) {
-        score += 6;
-      }
+    // Strong topic matching.
+    plan.topicKeywords.forEach((topic) => {
+      if (normalizedItem.includes(normalizeText(topic))) score += 14;
     });
 
-    if (
-      (q.includes('borrow') || q.includes('loan') || q.includes('money') || q.includes('cash') || q.includes('utang') || q.includes('pautang')) &&
-      (itemText.includes('loan') || itemText.includes('cash') || itemText.includes('subsidy') || itemText.includes('assistance') || itemText.includes('sss') || itemText.includes('pag-ibig') || itemText.includes('aics'))
-    ) {
-      score += 35;
+    // Exact title/phrase match is stronger than individual words.
+    const title = normalizeText(item.title || '');
+    if (title && q.includes(title)) score += 34;
+    if (q.length >= 8 && normalizedItem.includes(q)) score += 28;
+
+    // Individual words are intentionally low-weight.
+    score += scoreTextOverlap(plan.queryTokens, normalizedItem);
+
+    // Intent is scored separately.
+    score += scoreIntent(plan.intent, item);
+
+    // If the question asks for a list, prefer programs whose title/description
+    // actually represents an option instead of merely containing the word loan.
+    if (plan.intent === QUESTION_INTENTS.LIST) {
+      if (includesAny(itemText, ['loan', 'program', 'assistance', 'grant', 'subsidy'])) score += 10;
     }
 
-    if (
-      (q.includes('senior') || q.includes('elderly') || q.includes('60') || q.includes('osca')) &&
-      (itemText.includes('senior') || itemText.includes('osca') || itemText.includes('pension') || itemText.includes('philhealth'))
-    ) {
-      score += 35;
-    }
-
-    if (
-      (q.includes('student') || q.includes('tuition') || q.includes('scholarship') || q.includes('school')) &&
-      (itemText.includes('student') || itemText.includes('tuition') || itemText.includes('education') || itemText.includes('ched') || itemText.includes('spes'))
-    ) {
-      score += 35;
-    }
-
-    if (
-      (q.includes('hospital') || q.includes('medical') || q.includes('bill') || q.includes('malasakit') || q.includes('gamot') || q.includes('doh')) &&
-      (itemText.includes('hospital') || itemText.includes('medical') || itemText.includes('philhealth') || itemText.includes('map') || itemText.includes('doh'))
-    ) {
-      score += 35;
-    }
-
-    if (
-      (q.includes('job') || q.includes('work') || q.includes('trabaho') || q.includes('dole') || q.includes('tupad')) &&
-      (itemText.includes('tupad') || itemText.includes('employment') || itemText.includes('labor') || itemText.includes('dole'))
-    ) {
-      score += 35;
-    }
-
-    if (score > 0) {
+    // A topic match without an intent match should not be enough to create a
+    // strong RAG result. This threshold is intentionally conservative.
+    if (score >= 12) {
       scoredChunks.push({
         score,
+        relevance: score >= 35 ? 'strong' : 'supporting',
         title: item.title,
         agency: item.agency,
         category: item.categoryName || item.category,
-        content: `${item.title} (${item.agency}): ${item.fullDesc || item.shortDesc}. Entitlements: ${(item.benefits || []).join(', ')}. Requirements: ${(item.requirements || []).map((r) => (typeof r === 'string' ? r : r.name)).join(', ')}.`,
-        sourceUrl: item.officialSource?.url || 'https://www.gov.ph',
+        content: `${item.title} (${item.agency}): ${item.fullDesc || item.shortDesc || ''}. Benefits: ${(item.benefits || []).join(', ')}. Requirements: ${(item.requirements || []).map((r) => (typeof r === 'string' ? r : r?.name || '')).join(', ')}. Eligibility: ${item.eligibility || item.qualification || item.qualifications || 'Not provided in this record'}. Application process: ${item.applicationProcess || item.process || item.howToApply || 'Not provided in this record'}. Fees: ${item.fees || 'Not provided in this record'}. Processing time: ${item.processingTime || 'Not provided in this record'}.`,
+        sourceUrl: item.officialSource?.url || '',
+        rawItem: item,
       });
     }
   });
 
-  // 2. Score and retrieve matching scraped sources
   sources.forEach((s) => {
-    const sName = (s.agency_name || s.agencyName || s.name || '').toLowerCase();
-    const sCat = (s.category || '').toLowerCase();
+    const sName = normalizeText(s.agency_name || s.agencyName || s.name || '');
+    const sCat = normalizeText(s.category || '');
     const sUrl = s.official_url || s.officialUrl || s.url || '';
+    let score = 0;
 
-    let sScore = 0;
-    queryTokens.forEach((token) => {
-      if (sName.includes(token) || sCat.includes(token)) sScore += 5;
+    plan.topicKeywords.forEach((topic) => {
+      if (sName.includes(normalizeText(topic)) || sCat.includes(normalizeText(topic))) score += 6;
     });
 
-    if (sScore > 0) {
+    if (score > 0) {
       scoredChunks.push({
-        score: sScore,
+        score,
+        relevance: 'source-level',
         title: s.agency_name || s.name || 'Official Knowledge Source',
         agency: s.agency_name || 'Government Portal',
         category: s.category || 'General',
-        content: `Live Scraped Knowledge Source: ${s.agency_name || s.name} (${sUrl}). Sector: ${s.category || 'General'}. Continuous circular & charter monitoring enabled.`,
+        content: `Official knowledge source: ${s.agency_name || s.name || 'Government source'} (${sUrl}). Sector: ${s.category || 'General'}.`,
         sourceUrl: sUrl,
+        rawItem: s,
       });
     }
   });
 
   scoredChunks.sort((a, b) => b.score - a.score);
-  return scoredChunks.slice(0, 5);
+
+  return scoredChunks.slice(0, 6).map((chunk) => ({
+    ...chunk,
+    queryIntent: plan.intent,
+  }));
 }
 
 /**
- * Build dynamic RAG grounding context from all scraped websites, opportunities, and citizen profile
+ * Kept as a public helper for existing imports.
+ * The result now reflects question intent instead of simple keyword routing.
+ */
+export function classifyQueryIntent(userQuery, ragChunks = [], conversationHistory = []) {
+  const plan = analyzeQuestion(userQuery, conversationHistory);
+
+  if (ragChunks.some((chunk) => chunk.score >= 35)) return 'rag';
+
+  // Procedural government-document questions are valid general questions even
+  // when the RAG database has no matching program.
+  if (plan.topicKeywords.some((topic) => [
+    'barangay clearance', 'nbi clearance', 'police clearance', 'birth certificate',
+    'passport', 'driver license', 'tin',
+  ].includes(topic))) {
+    return ragChunks.length > 0 ? 'hybrid' : 'general';
+  }
+
+  return ragChunks.length > 0 ? 'rag' : 'general';
+}
+
+function formatRagContext(retrievedChunks, plan) {
+  if (!retrievedChunks.length) {
+    return 'No sufficiently relevant verified program record was retrieved for this question.\n';
+  }
+
+  return retrievedChunks.map((chunk, index) => {
+    return [
+      `[Verified Candidate ${index + 1}]`,
+      `Title: ${chunk.title || 'Unknown'}`,
+      `Agency: ${chunk.agency || 'Unknown'}`,
+      `Category: ${chunk.category || 'General'}`,
+      `Relevance score: ${chunk.score}`,
+      `Retrieved because of: ${chunk.relevance}`,
+      `Verified source: ${chunk.sourceUrl || 'No specific source URL stored'}`,
+      `Content: ${chunk.content}`,
+    ].join('\n');
+  }).join('\n\n');
+}
+
+/**
+ * Build the RAG context. The context explicitly separates "candidate data"
+ * from "answer" so Gemini knows that retrieval candidates are not automatically
+ * the answer to the question.
  */
 export function buildGroundingContext(userQuery, options = {}) {
-  const { opp, user, opportunities = [], sources = [], userDocs = [] } = options;
+  const {
+    opp,
+    user,
+    opportunities = [],
+    sources = [],
+    userDocs = [],
+    conversationHistory = [],
+  } = options;
 
+  const plan = analyzeQuestion(userQuery, conversationHistory);
   const retrievedChunks = retrieveRelevantKnowledgeChunks(userQuery, {
     opp,
     opportunities,
     sources,
     userDocs,
+    conversationHistory,
   });
 
-  let rag = '\n\n## VERIFIED REAL-TIME RETRIEVED KNOWLEDGE BASE (RAG CONTEXT - STRICT FACT-CHECKED TRUTH):\n';
+  let rag = '\n\n## VERIFIED RETRIEVED KNOWLEDGE\n';
+  rag += 'Important: Retrieved records are CANDIDATES, not automatic answers. Only use a record if it answers the exact requested intent.\n';
+  rag += `Detected question intent: ${plan.intent}\n`;
+  rag += `Detected topic(s): ${plan.topicKeywords.join(', ') || 'general'}\n\n`;
+  rag += formatRagContext(retrievedChunks, plan);
 
-  if (retrievedChunks.length > 0) {
-    retrievedChunks.forEach((chunk, i) => {
-      rag += `[Retrieved Grounded Source ${i + 1}] ${chunk.title} (${chunk.agency} - ${chunk.category})\n`;
-      rag += `• Details: ${chunk.content}\n`;
-      rag += `• Official Verified Link: ${chunk.sourceUrl}\n\n`;
-    });
-  } else {
-    opportunities.slice(0, 4).forEach((o, i) => {
-      rag += `[General Program ${i + 1}] ${o.title} (${o.agency})\n`;
-      rag += `• Details: ${o.shortDesc || o.fullDesc}\n`;
-      rag += `• Official Verified Link: ${o.officialSource?.url || 'https://www.gov.ph'}\n\n`;
-    });
+  if (!retrievedChunks.length && opportunities.length > 0) {
+    rag += '\nNo relevant opportunity was retrieved. Do not select an unrelated program just because it shares one word with the question.\n';
   }
 
-  // User Profile Context
   if (user) {
-    rag += `### CITIZEN PROFILE CONTEXT:\n`;
-    rag += `• Citizen Name: ${user.firstName || 'Adones'} ${user.lastName || 'Santos'}\n`;
+    rag += '\n### CITIZEN PROFILE CONTEXT\n';
+    rag += `• Citizen Name: ${user.firstName || ''} ${user.lastName || ''}`.trim() + '\n';
     rag += `• Resident Status: ${user.isVerified ? 'eGov PH Verified Citizen' : 'Citizen'}\n`;
     if (userDocs && userDocs.length > 0) {
       rag += `• Uploaded Verified Documents in Vault: ${userDocs.map((d) => d.name).join(', ')}\n`;
     }
-    rag += '\n';
   }
 
   return rag;
 }
 
 /**
- * Intelligent Deterministic Grounded Responder segmented by Citizen Persona with Anti-Scam Verification
+ * General-government fallback used only when Gemini is unavailable.
+ * This is deliberately useful for common procedural questions instead of
+ * returning the old generic four-line government-services message.
  */
 function generateStructuredGroundedAnswer(cleanQ, options = {}) {
-  const { opp, userDocs = [] } = options;
+  const q = normalizeText(cleanQ);
+  const { opp, opportunities = [], userDocs = [] } = options;
 
-  // 1. Specific Program Focused (when opened from a card)
+  // 1. Explicit Single Opportunity Focus
   if (opp) {
-    if (cleanQ.includes('document') || cleanQ.includes('need') || cleanQ.includes('require')) {
-      const docList =
-        opp.requirements
-          ?.map((r) => {
-            const name = typeof r === 'string' ? r : r.name;
-            const hasDoc = userDocs.some((d) => (d.name || '').toLowerCase().includes(name.toLowerCase().substring(0, 6)));
-            return `• ${name} — ${hasDoc ? '✓ Verified in Profile' : 'Action Required'}`;
-          })
-          .join('\n') || '• Valid Government Issued ID\n• Official Application Form';
-      return `Here are the official document requirements for ${opp.title}:\n\n${docList}\n\nWhere to Submit: Apply directly at the nearest ${opp.agency} office or Malasakit Center desk.\n\nVerified Source: ${opp.officialSource?.url || 'https://www.gov.ph'}`;
+    if (includesAny(q, ['requirements', 'documents', 'what do i need', 'what do i bring'])) {
+      const docList = (opp.requirements || [])
+        .map((r) => {
+          const name = typeof r === 'string' ? r : r?.name || 'Required document';
+          const hasDoc = Array.isArray(userDocs) && userDocs.some((d) => normalizeText(d.name || '').includes(normalizeText(name).slice(0, 6)));
+          return `• ${name} — ${hasDoc ? '✓ Verified in Profile' : 'Action Required'}`;
+        })
+        .join('\n') || '• Check the official program record for the required documents.';
+      return `Requirements for ${opp.title}:\n\n${docList}\n\nVerified Source: ${opp.officialSource?.url || 'https://www.gov.ph'}`;
     }
 
-    if (cleanQ.includes('eligible') || cleanQ.includes('qualify') || cleanQ.includes('am i')) {
-      return `Eligibility Evaluation for ${opp.title}:\n\n• Program: ${opp.title} (${opp.agency})\n• Match Rating: ${opp.matchScore || 92}% Match\n• Status: Likely Eligible based on verified profile credentials.\n\nEntitled Benefits:\n${opp.benefits?.map((b) => `• ${b}`).join('\n') || '• Full covered assistance'}\n\nVerified Source: ${opp.officialSource?.url || 'https://www.gov.ph'}`;
+    if (includesAny(q, ['eligible', 'qualify', 'am i'])) {
+      return `Eligibility for ${opp.title}:\n\n• Program: ${opp.title}\n• Agency: ${opp.agency}\n• Eligibility: ${opp.eligibility || opp.qualification || opp.qualifications || 'Available to eligible Philippine citizens meeting agency criteria.'}\n\nVerified Source: ${opp.officialSource?.url || 'https://www.gov.ph'}`;
     }
 
-    if (cleanQ.includes('where') || cleanQ.includes('apply') || cleanQ.includes('how')) {
-      return `Application Guide for ${opp.title}:\n\n1. Prepare required documents in your Alalay Vault.\n2. Submit to the nearest ${opp.agency} branch office or hospital Malasakit Center desk.\n3. Present your verified PhilSys National ID for express processing.\n\nOfficial Portal: ${opp.officialSource?.url || 'https://www.gov.ph'}`;
+    if (includesAny(q, ['where', 'apply', 'how', 'steps'])) {
+      return `How to apply for ${opp.title}:\n\n1. Review the listed requirements.\n2. Prepare your required identification and supporting papers.\n3. Submit through the ${opp.agency || 'responsible agency'} frontline desk or official portal.\n\nOfficial Source: ${opp.officialSource?.url || 'https://www.gov.ph'}`;
+    }
+
+    return `${opp.title} (${opp.agency}):\n\n• Overview: ${opp.fullDesc || opp.shortDesc || 'Government assistance program'}\n• Entitlements: ${(opp.benefits || []).join(', ') || 'Coverage and financial support under agency guidelines'}\n• Source: ${opp.officialSource?.url || 'https://www.gov.ph'}`;
+  }
+
+  // 2. Student Benefits & Scholarships
+  if (q.includes('student') || q.includes('estudyante') || q.includes('school') || q.includes('scholarship') || q.includes('tuition')) {
+    const studentOpps = opportunities.filter((o) => {
+      const t = normalizeText(`${o.title} ${o.category} ${o.categoryName} ${o.agency} ${o.shortDesc}`);
+      return t.includes('student') || t.includes('tertiary') || t.includes('unifast') || t.includes('ched') || t.includes('spes') || t.includes('education');
+    });
+
+    let result = `Filipino students are entitled to key statutory benefits, tuition subsidies, and discounts under Philippine law:\n\n` +
+      `1. Mandatory 20% Fare Discount (RA 11314 - Student Fare Discount Act):\n` +
+      `• 20% discount on all domestic public transportation: Jeepneys, Buses, UV Express, MRT/LRT, Ferries, and Domestic Airline flights.\n` +
+      `• Valid every day including weekends and holidays upon presentation of a valid School ID.\n\n` +
+      `2. Free Higher Education (RA 10931):\n` +
+      `• 100% Free Tuition and miscellaneous school fees in all State Universities and Colleges (SUCs) and Local Universities and Colleges (LUCs).\n\n` +
+      `3. CHED & UniFAST Tertiary Education Subsidy (TES / Tulong Dunong):\n` +
+      `• Cash allowance of ₱20,000 to ₱40,000 per academic year for books, living allowance, and education expenses.\n` +
+      `• Apply through your college Registrar or Student Affairs Office (SFAO) and at https://unifast.gov.ph.\n\n` +
+      `4. DOLE SPES Student Bridging Employment:\n` +
+      `• Temporary paid wage employment during summer/semestral breaks with 40% government educational voucher subsidy.\n` +
+      `• Apply at your local Public Employment Service Office (PESO).\n\n` +
+      `5. Republic Act 11261 (First-Time Jobseekers Act):\n` +
+      `• Free issuance of Barangay Clearance, NBI Clearance, Police Clearance, and Medical Certificates for graduating students applying for their first job.`;
+
+    if (studentOpps.length > 0) {
+      result += `\n\nMatched Verified Scraped Programs:\n` +
+        studentOpps.slice(0, 3).map((o) => `• ${o.title} (${o.agency}): ${(o.benefits || []).join(', ') || o.shortDesc}`).join('\n');
+    }
+
+    return result;
+  }
+
+  // 3. Senior Citizen Benefits (RA 9994 & RA 10645)
+  if (q.includes('senior') || q.includes('elderly') || q.includes('osca') || q.includes('pension')) {
+    return (
+      `Filipino Senior Citizens (Age 60+) are entitled to comprehensive statutory benefits under RA 9994 and RA 10645:\n\n` +
+      `1. 20% Statutory Discount & 12% VAT Exemption:\n` +
+      `• All prescription medicines, vitamins, and medical/dental supplies\n` +
+      `• Professional fees of attending physicians in all private clinics and hospitals\n` +
+      `• Public transportation fares (Jeepney, Bus, MRT, LRT, Taxis, Domestic Flights, Ships)\n` +
+      `• Hotels, restaurants, recreation centers, movie theaters, and funeral services\n` +
+      `• 5% special grocery discount on basic necessities and prime commodities\n\n` +
+      `2. 100% Free Mandatory PhilHealth Coverage (RA 10645):\n` +
+      `• Automatic subsidized PhilHealth membership with Zero-Balance Billing in public hospital wards\n\n` +
+      `3. DSWD Social Pension for Indigent Senior Citizens (SPISC):\n` +
+      `• ₱1,000 monthly cash stipend for seniors without regular pension or income (apply at OSCA)\n\n` +
+      `4. Centenarian Cash Gift (RA 10868 / RA 11982):\n` +
+      `• ₱10,000 milestone cash gifts at ages 80, 85, 90, and 95, and ₱100,000 at age 100.\n\n` +
+      `Official Agency: City/Municipal Office of Senior Citizens Affairs (OSCA) & https://www.philhealth.gov.ph`
+    );
+  }
+
+  // 4. Philippine Government Loans & Multi-Purpose Cash Assistance
+  if (q.includes('loan') || q.includes('borrow') || q.includes('pautang') || q.includes('utang') || q.includes('pera') || q.includes('cash')) {
+    return (
+      `Here are the official Philippine government loan programs available by member category:\n\n` +
+      `1. SSS Salary Loan (Employed / Self-Employed / OFW):\n` +
+      `• Amount: 1 to 2 months average basic salary credit\n` +
+      `• Interest: 10% annual interest rate computed on diminishing balance\n` +
+      `• Terms: 24 equal monthly installments with direct bank or e-wallet disbursement\n` +
+      `• Portal: https://www.sss.gov.ph\n\n` +
+      `2. SSS Calamity Loan Assistance Program (CLAP):\n` +
+      `• 7% interest per annum for declared calamity areas with 24-month payment terms\n\n` +
+      `3. Pag-IBIG Multi-Purpose Cash Loan (HDMF MPL):\n` +
+      `• Loan up to 80% of your accumulated Total Accumulated Value (TAV)\n` +
+      `• Terms: 10.5% p.a. interest, 24 to 36 month repayment period via Virtual Pag-IBIG (https://www.pagibigfund.gov.ph)\n\n` +
+      `4. DSWD AICS Emergency Cash Assistance (Non-Repayable Grant):\n` +
+      `• ₱3,000 to ₱10,000 outright cash grant for emergency food, medicine, or family crisis support (apply at DSWD Field Office/CSWDO).\n\n` +
+      `Anti-Scam Reminder: Official government loans and subsidies are processed exclusively via .gov.ph portals and branch offices. Never pay upfront processing fees.`
+    );
+  }
+
+  // 5. Medical & Hospital Financial Assistance
+  if (q.includes('hospital') || q.includes('medical') || q.includes('malasakit') || q.includes('doh') || q.includes('bill') || q.includes('gamot')) {
+    return (
+      `Assistance for Hospital Bills & Healthcare in the Philippines:\n\n` +
+      `1. Malasakit Centers (One-Stop Action Desk):\n` +
+      `• Located inside all DOH-run and accredited public hospitals nationwide.\n` +
+      `• Coordinates assistance from PhilHealth, PCSO, DSWD, and DOH Medical Assistance for Indigent Patients (MAP).\n\n` +
+      `2. PhilHealth Universal Health Care:\n` +
+      `• Direct deduction from hospital bill and Zero-Balance Billing in public hospital basic ward beds.\n\n` +
+      `3. DOH Medical Assistance for Indigent Patients (MAP):\n` +
+      `• Guarantee Letters (GL) covering surgical supplies, laboratories, MRI/CT scans, dialysis, and medicines.\n\n` +
+      `4. PCSO Individual Medical Assistance Program (IMAP):\n` +
+      `• Cash vouchers and Guarantee Letters for hospitalization, chemotherapy, and specialty procedures.\n\n` +
+      `Requirements to Bring: Clinical Abstract / Medical Certificate, Statement of Account (SOA) with hospital stamp, Barangay Certificate of Indigency, and Valid Photo ID.`
+    );
+  }
+
+  // 6. Procedural Civil Documents: Barangay Clearance
+  if (q.includes('barangay') && (q.includes('clearance') || q.includes('cert') || q.includes('how'))) {
+    return (
+      `Step-by-Step Guide: How to Get a Barangay Clearance in the Philippines\n\n` +
+      `1. Requirements to Bring:\n` +
+      `• Valid Government Photo ID (PhilSys National ID, Voter's ID, Postal ID, Driver's License, or Student ID)\n` +
+      `• Community Tax Certificate (Cedula) — can be obtained at the same Barangay Hall\n` +
+      `• Proof of Residency (Utility bill or lease agreement)\n` +
+      `• 1x1 or 2x2 ID Photo (if required by your barangay)\n\n` +
+      `2. Procedure:\n` +
+      `1. Go to your local Barangay Hall where you reside.\n` +
+      `2. Fill out the Barangay Clearance Application Form stating your purpose.\n` +
+      `3. Pay the processing fee (₱50 – ₱200) at the Barangay Treasurer desk.\n` +
+      `4. Wait for signature and official seal release (typically 15–30 minutes same-day).\n\n` +
+      `Note: Under RA 11261 (First-Time Jobseekers Act), Barangay Clearance is 100% FREE for first-time job applicants upon presenting a First-Time Jobseeker Oath/Certificate.`
+    );
+  }
+
+  // 7. NBI & Police Clearance
+  if (q.includes('nbi') || q.includes('police clearance')) {
+    return (
+      `Step-by-Step Guide: How to Get NBI & Police Clearances\n\n` +
+      `1. NBI Clearance:\n` +
+      `1. Register online at https://clearance.nbi.gov.ph.\n` +
+      `2. Choose branch, date, and appointment time.\n` +
+      `3. Pay ₱130 + ₱25 e-service fee via GCash, Maya, or 7-Eleven.\n` +
+      `4. Appear on your scheduled date with 2 valid IDs for photo and biometric capture.\n\n` +
+      `2. National Police Clearance:\n` +
+      `1. Register at https://pnpclearance.ph.\n` +
+      `2. Book an appointment at your nearest Police Station and pay ₱150 fee.\n` +
+      `3. Present 2 valid IDs on your appointment date for biometric release.`
+    );
+  }
+
+  // 8. PSA Birth / Marriage Certificate
+  if (q.includes('birth certificate') || q.includes('psa') || q.includes('marriage certificate')) {
+    return (
+      `How to Request a PSA Birth / Marriage Certificate:\n\n` +
+      `• Online Delivery: Visit https://www.psaserbilis.com.ph or https://psahelpline.ph (₱330 per copy, delivered to your door in 3–5 business days).\n` +
+      `• In-Person Walk-in: Book a mandatory appointment at https://appointment.psa.gov.ph before visiting any PSA CRS Outlet (₱155 per copy, same-day release with valid ID).`
+    );
+  }
+
+  // 9. Generic Opportunity Matcher
+  if (opportunities.length > 0) {
+    const matched = opportunities.filter((o) => {
+      const text = normalizeText(`${o.title} ${o.category} ${o.agency} ${o.shortDesc}`);
+      return q.split(/\s+/).some((word) => word.length > 3 && text.includes(word));
+    });
+
+    if (matched.length > 0) {
+      return (
+        `Here are the relevant verified Philippine government programs matching your inquiry:\n\n` +
+        matched.slice(0, 3).map((o, idx) => `${idx + 1}. ${o.title} (${o.agency})\n• Details: ${o.shortDesc || o.fullDesc}\n• Benefits: ${(o.benefits || []).join(', ') || 'Official government assistance'}\n• Official Portal: ${o.officialSource?.url || 'https://www.gov.ph'}`).join('\n\n') +
+        `\n\nVisit the official agency portals or your local branch desk to apply.`
+      );
     }
   }
 
-  // 2. Borrow Money / Loans / Cash Grants / Financial Assistance (Persona-Segmented)
-  if (
-    cleanQ.includes('borrow') ||
-    cleanQ.includes('loan') ||
-    cleanQ.includes('money') ||
-    cleanQ.includes('cash') ||
-    cleanQ.includes('utang') ||
-    cleanQ.includes('pautang') ||
-    cleanQ.includes('fund') ||
-    cleanQ.includes('financial assistance')
-  ) {
-    return (
-      `Here are the legitimate Philippine government loan and emergency financial assistance programs categorized by your citizen profile:\n\n` +
-      `💼 If you are an Employed Worker or Contributing Member:\n` +
-      `1. SSS Calamity Loan Assistance Program (CLAP)\n` +
-      `• Loan Amount: Equivalent to average of 12 latest posted Monthly Salary Credits (MSCs)\n` +
-      `• Interest Rate Matrix:\n` +
-      `  - Initial Applications & Renewals without penalty condonation for past 5 years: 7% interest per annum (Annual EIR: 7.10% - 8.17%)\n` +
-      `  - Renewals with previous penalty condonation within past 5 years: 10% interest per annum (Annual EIR: 9.88% - 11.46%)\n` +
-      `• Repayment Term: 24 equal monthly installments with instant My.SSS online disbursement\n` +
-      `• Requirements: At least 36 posted monthly contributions (6 within last 12 months), Barangay Calamity Certification, UMID/PhilSys ID\n` +
-      `• Official Portal: https://www.sss.gov.ph\n\n` +
-      `2. SSS Salary Loan Program\n` +
-      `• Loan Amount: 1 to 2 months average basic salary credit\n` +
-      `• Interest: 10% annual interest rate computed on diminishing principal balance\n` +
-      `• Official Portal: https://www.sss.gov.ph\n\n` +
-      `3. Pag-IBIG Multi-Purpose Cash Loan (HDMF MPL)\n` +
-      `• Loan Amount: Up to 80% of your total accumulated Pag-IBIG savings\n` +
-      `• Terms: 10.5% p.a. interest, 24 to 36 month repayment period\n` +
-      `• Requirements: At least 24 monthly contributions, valid government photo ID\n` +
-      `• Official Portal: https://www.pagibigfund.gov.ph\n\n` +
-      `🤝 If you are an Indigent Citizen or Family in Emergency Crisis:\n` +
-      `3. DSWD AICS Emergency Cash Assistance (Non-Repayable Grant)\n` +
-      `• Assistance: ₱3,000 to ₱10,000 outright cash grant for medical, food, or crisis support\n` +
-      `• Requirements: Barangay Certificate of Indigency, Valid Government ID\n` +
-      `• Where to Apply: Nearest DSWD Field Office or City Social Welfare (CSWDO) desk\n` +
-      `• Official Portal: https://www.dswd.gov.ph\n\n` +
-      `🎓 If you are a College Student Enrolled in Higher Education:\n` +
-      `4. UniFAST Tertiary Education Subsidy (TES) & Tulong Dunong Grant\n` +
-      `• Benefit: ₱20,000 to ₱40,000 per academic year for books, tuition, and living allowance\n` +
-      `• Where to Apply: Apply directly through your college/university's official Registrar / Student Affairs Office or unifast.gov.ph\n` +
-      `• Official Portal: https://unifast.gov.ph & https://ched.gov.ph\n\n` +
-      `🛡️ Anti-Fraud Advisory: All legitimate government subsidies and loan applications are processed exclusively through official .gov.ph portals or on-site agency desks. Never pay processing fees to third-party social media pages.`
-    );
-  }
-
-  // 3. Senior Citizen Benefits & Free Healthcare
-  if (
-    cleanQ.includes('senior') ||
-    cleanQ.includes('elderly') ||
-    cleanQ.includes('osca') ||
-    cleanQ.includes('60')
-  ) {
-    return (
-      `👴 If you are a Senior Citizen (Age 60 and above):\n\n` +
-      `1. Free Mandatory PhilHealth Coverage (RA 10645)\n` +
-      `• 100% Subsidized Hospital Room and Board in public hospital wards\n` +
-      `• Zero-Balance Billing (Zero out-of-pocket expenses for ward accommodations)\n` +
-      `• 20% Statutory Discount & 12% VAT Exemption on all Prescription Medicines\n` +
-      `• Requirements: OSCA Senior Citizen ID or PhilSys National ID\n` +
-      `• Official Portal: https://www.philhealth.gov.ph\n\n` +
-      `2. DSWD Social Pension for Indigent Senior Citizens (SPISC)\n` +
-      `• Monthly cash stipend for seniors without regular income or institutional pension\n` +
-      `• Where to Apply: City/Municipal Office of Senior Citizens Affairs (OSCA)\n` +
-      `• Official Portal: https://www.dswd.gov.ph`
-    );
-  }
-
-  // 4. Student Programs & Educational Assistance
-  if (
-    cleanQ.includes('student') ||
-    cleanQ.includes('tuition') ||
-    cleanQ.includes('scholarship') ||
-    cleanQ.includes('spes') ||
-    cleanQ.includes('school')
-  ) {
-    return (
-      `🎓 If you are a Student or Youth:\n\n` +
-      `1. Tertiary Education Subsidy (TES / UniFAST)\n` +
-      `• Subsidies for tuition, books, and living allowances up to ₱40,000/year for undergraduate students\n` +
-      `• How to Apply: Apply exclusively via your school Registrar / Student Financial Office or unifast.gov.ph\n` +
-      `• Official Portal: https://unifast.gov.ph\n\n` +
-      `2. SPES Student Bridging Employment (DOLE)\n` +
-      `• Temporary student wage employment with 40% salary paid via government educational vouchers\n` +
-      `• Requirements: Certificate of Registration (COR), Passing Grades, Valid Student ID\n` +
-      `• Where to Apply: Local Government Public Employment Service Office (PESO)\n` +
-      `• Official Portal: https://dole.gov.ph\n\n` +
-      `🛡️ Anti-Scam Advisory: Beware of unofficial Facebook groups posing as CHED/UniFAST. Genuine grants are 100% free with no application fees.`
-    );
-  }
-
-  // 5. Medical & Hospital Assistance
-  if (
-    cleanQ.includes('hospital') ||
-    cleanQ.includes('medical') ||
-    cleanQ.includes('malasakit') ||
-    cleanQ.includes('medicine') ||
-    cleanQ.includes('doh') ||
-    cleanQ.includes('bill')
-  ) {
-    return (
-      `🏥 If you or a Family Member need Hospital or Medical Assistance:\n\n` +
-      `1. DOH Medical Assistance for Indigent Patients (MAP) via Malasakit Centers\n` +
-      `• Direct guarantee letters covering hospital bills, surgery supplies, laboratory tests, and dialysis\n` +
-      `• Free diagnostic scan vouchers (CT Scan / MRI) and subsidized chemotherapy drugs\n` +
-      `• Where to Apply: Malasakit Center desk inside any accredited public hospital\n` +
-      `• Official Portal: https://doh.gov.ph\n\n` +
-      `2. PhilHealth Universal Health Care & Konsulta\n` +
-      `• Free primary consultations, preventive health screenings, and generic maintenance medicines\n` +
-      `• Mandatory Zero-Balance Billing in public hospital ward beds\n` +
-      `• Official Portal: https://www.philhealth.gov.ph`
-    );
-  }
-
-  // 6. Labor & Employment Assistance
-  if (
-    cleanQ.includes('job') ||
-    cleanQ.includes('work') ||
-    cleanQ.includes('dole') ||
-    cleanQ.includes('tupad') ||
-    cleanQ.includes('trabaho')
-  ) {
-    return (
-      `👷 If you are a Displaced Worker, Seasonal Worker, or Underemployed:\n\n` +
-      `1. DOLE TUPAD Emergency Wage Employment\n` +
-      `• 10 to 30 days community employment with guaranteed regional minimum cash wage\n` +
-      `• Free GSIS micro-insurance and safety uniform kit\n` +
-      `• Where to Apply: Local Barangay Hall or City/Municipal PESO Office\n` +
-      `• Official Portal: https://dole.gov.ph\n\n` +
-      `2. DOLE Integrated Livelihood Program (DILP)\n` +
-      `• Grant assistance for self-employed individuals and community enterprise projects\n` +
-      `• Official Portal: https://dole.gov.ph`
-    );
-  }
-
-  return `ALALAY is grounded in verified Philippine Citizen's Charters. All government assistance, loans, and subsidies are retrieved from official .gov.ph portals. Visit your nearest Malasakit Center, OSCA, PESO, or DSWD office for on-site assistance.`;
+  return `Here are the steps to access Philippine government services:\n\n1. Prepare valid government identification (PhilSys National ID, UMID, Postal ID, or Voter's ID).\n2. For civil requirements, visit your local Barangay Hall or City Hall frontline desk.\n3. For statutory benefits (SSS, PhilHealth, DSWD, Pag-IBIG), use the official .gov.ph portals or visit the nearest branch office.\n4. Official government forms and standard service consultations are free of charge.`;
 }
 
 /**
- * Ask Alalay AI with Full 8-Layer Guardrails Protection & RAG Grounding
+ * Ask ALALAY AI.
+ *
+ * The important change is that the model is explicitly required to separate:
+ *   SUBJECT = what the question is about
+ *   INTENT  = what the citizen wants to know about that subject
+ *
+ * Example:
+ *   "What loans are applicable for students?"
+ *       -> intent = list_available_options
+ *
+ *   "What are the requirements for the student loan?"
+ *       -> intent = requirements
+ *
+ * They may share the same topic, but they must not receive the same answer.
  */
 export async function askAlalayAI(userQuestion, options = {}) {
-  const cleanQ = userQuestion.trim().toLowerCase();
+  const originalQuestion = String(userQuestion || '').trim();
+  if (!originalQuestion) return 'Please enter a question so I can help you.';
 
   const contextOptions = typeof options === 'string' ? { contextType: options } : options;
+  const {
+    opportunities = [],
+    sources = [],
+    opp = null,
+    user = null,
+    userDocs = [],
+    conversationHistory = [],
+  } = contextOptions;
 
-  // 1. Build RAG Grounded Context dynamically retrieved for this specific query
-  const ragContext = buildGroundingContext(userQuestion, contextOptions);
+  const plan = analyzeQuestion(originalQuestion, conversationHistory);
+  const ragContext = buildGroundingContext(originalQuestion, contextOptions);
+
+  const historyText = Array.isArray(conversationHistory) && conversationHistory.length
+    ? conversationHistory.slice(-6).map((m, i) => {
+      const role = m?.role || (i % 2 === 0 ? 'user' : 'assistant');
+      const text = typeof m === 'string' ? m : (m?.content || m?.text || '');
+      return `${role}: ${text}`;
+    }).join('\n')
+    : 'No previous conversation provided.';
 
   const systemPrompt =
-    'You are ALALAY, a highly analytical Closed-Domain Opportunity Extraction and Validation Engine and government assistant in the Philippines.\n' +
-    'Evaluate all citizen queries strictly against verified official admin-provided core agency web text.\n' +
-    'STRICT ADMINISTRATIVE ENFORCEMENT & EMBEDDED BENCHMARKS:\n' +
-    '1. NO OPEN-INTERNET BROWSING OR FABRICATIONS: Strictly ground responses in the provided verified .gov.ph contexts (ched.gov.ph, unifast.gov.ph, sss.gov.ph, philhealth.gov.ph, doh.gov.ph, dole.gov.ph).\n' +
-    '2. CROSS-SECTOR BRACKET EXTRACTION & ANTI-FLATTENING:\n' +
-    '   - Public sector metrics are heavily gated by tiered rules. Never isolate a metric without binding it directly to its mandatory qualifier condition.\n' +
-    '   - For SSS Calamity Loans: Initial applications & renewals without penalty condonation for the past 5 years = 7% interest per annum (EIR: 7.10% - 8.17%). Renewals with previous penalty condonation within past 5 years = 10% interest per annum (EIR: 9.88% - 11.46%).\n' +
-    '   - For SSS Salary Loans: 10% annual interest rate.\n' +
-    '   - For Pag-IBIG Multi-Purpose Loans: 10.5% annual interest up to 80% of accumulated savings.\n' +
-    '   - For UniFAST / CHED: Subsidies are applied through official campus Registrar/SFAO and unifast.gov.ph, never third-party links.\n' +
-    '3. SEGMENT BY CITIZEN PERSONA:\n' +
-    '   - "💼 If you are an Employed Worker / Member:"\n' +
-    '   - "🤝 If you are an Indigent Citizen / Family in Crisis:"\n' +
-    '   - "🎓 If you are an Enrolled College Student:"\n' +
-    '   - "👴 If you are a Senior Citizen (Age 60+):"\n' +
-    '   - "👷 If you are a Displaced / Informal Worker:"\n' +
-    '4. Clean visual formatting: Bullet points (• ), numbered steps (1., 2.), checklist tags (✓ Met / ✗ Missing), Philippine Peso (₱). NO markdown asterisks (**).\n' +
-    '5. Anti-Scam Advisory: Official government grants and application forms are 100% free.\n' +
-    '6. Always end with verified official source reference URLs.\n' +
+    'You are ALALAY, an intelligent Philippine government service assistant for Filipino citizens.\n\n' +
+    'YOUR JOB IS NOT TO MATCH WORDS. YOUR JOB IS TO UNDERSTAND THE CITIZENS REQUEST.\n\n' +
+
+    'QUESTION UNDERSTANDING RULES:\n' +
+    '1. Identify the SUBJECT separately from the INTENT.\n' +
+    '2. The subject is the government program, loan, benefit, document, agency, or service.\n' +
+    '3. The intent is what the citizen wants to know: available options, requirements, eligibility, application steps, location, benefits, fees, processing time, documents, or general information.\n' +
+    '4. Words such as "loan", "student", "SSS", or "DSWD" identify a topic. They are NOT by themselves the answer.\n' +
+    '5. If the citizen asks "what loans are applicable for students", answer which loan/program options are applicable. Do NOT turn the answer into a requirements list unless requirements are explicitly requested.\n' +
+    '6. If the citizen asks "what are the requirements for the student loan", answer the requirements/documents for the relevant loan. Do NOT repeat the previous list of loans.\n' +
+    '7. If the citizen asks a follow-up such as "what are the requirements for it?" or "where can I apply for it?", use the recent conversation history to resolve "it".\n' +
+    '8. Ignore irrelevant retrieved records even if they share a keyword with the question.\n\n' +
+
+    'SOURCE PRIORITY:\n' +
+    'A. VERIFIED RETRIEVED KNOWLEDGE: Use this when a retrieved record directly answers the exact question intent. Cite its specific source URL when available.\n' +
+    'B. GENERAL PHILIPPINE GOVERNMENT KNOWLEDGE: Use this for ordinary government-document and procedural questions that are not covered by the verified records, such as Barangay Clearance, NBI Clearance, PSA certificates, passport, cedula, LTO, etc.\n' +
+    'C. If neither source can support a specific claim, do not invent it. Say that the current information could not be verified and give the safest next step.\n\n' +
+
+    'RAG RULES:\n' +
+    '1. Retrieved records are candidates, NOT automatically the answer.\n' +
+    '2. Match the record to BOTH the subject AND the requested intent.\n' +
+    '3. For REQUIREMENTS/DOCUMENTS questions, prioritize requirement/document fields.\n' +
+    '4. For BENEFITS questions, prioritize benefits/coverage fields.\n' +
+    '5. For ELIGIBILITY questions, prioritize eligibility/qualification fields.\n' +
+    '6. For APPLICATION questions, prioritize application/process fields.\n' +
+    '7. For LIST questions, list the relevant programs/options and briefly explain why they match. Do not dump all requirements unless requested.\n' +
+    '8. Never select a program solely because it contains a word from the question.\n\n' +
+
+    'GENERAL QUESTION RULE:\n' +
+    'If the question is not represented in the verified program data, answer it normally using your general knowledge of Philippine government offices and procedures. For local requirements, fees, schedules, or other details that may vary by LGU/barangay, explicitly say they can vary and should be verified with the relevant local office.\n\n' +
+
+    'ANSWER RULES:\n' +
+    '• Answer the exact question first.\n' +
+    '• Use numbered steps for procedures.\n' +
+    '• Use bullet points (•) for requirements, options, or lists.\n' +
+    '• Do not repeat unrelated information merely because it appears in retrieved context.\n' +
+    '• Do not output your reasoning, internal analysis, question classification, or source-selection process.\n' +
+    '• Do not invent fees, requirements, processing times, URLs, or government rules.\n' +
+    '• Use a specific office or official source when it is known.\n' +
+    '• If a local government requirement can vary, say so instead of presenting one local rule as universal.\n' +
+    '• Do not force a generic answer when the question can be answered specifically.\n' +
+    '• No markdown asterisks.\n\n' +
     getDictionaryContext() +
     ragContext;
 
-  // 2. Check for Gemini API key
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return generateStructuredGroundedAnswer(cleanQ, contextOptions);
+  const userInstruction =
+    `RECENT CONVERSATION (use only when needed to resolve follow-ups):\n${historyText}\n\n` +
+    `CURRENT CITIZEN QUESTION:\n${originalQuestion}\n\n` +
+    `LOCAL QUESTION PLAN (a hint, not the answer):\n` +
+    `- Intent: ${plan.intent}\n` +
+    `- Topic: ${plan.topicKeywords.join(', ') || 'general'}\n` +
+    `- Follow-up: ${plan.isFollowUp ? 'yes' : 'no'}\n\n` +
+    'Now answer the CURRENT CITIZEN QUESTION only. Match the requested intent, not merely the shared keywords.';
+
+  // 1. Preferred Route: Call secure backend proxy (zero credential exposure in browser)
+  try {
+    const backendRes = await fetch('/api/alalay/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt,
+        userInstruction,
+        temperature: 0.1,
+        maxOutputTokens: 1400,
+      }),
+    });
+
+    if (backendRes.ok) {
+      const backendData = await backendRes.json();
+      if (backendData.success && backendData.text && backendData.text.trim().length > 10) {
+        return cleanMarkdownText(backendData.text);
+      }
+    }
+  } catch {
+    // If backend proxy is not reachable, fall through to client direct fetch or grounded generator
   }
 
-  const models = (['gemini-3.6-flash']);
+  // 2. Direct client fallback if API key is provided and backend proxy is bypassed
+  let apiKey = getApiKey();
+  if (apiKey) {
+    const models = [
+      'gemini-3.6-flash',
+      'gemini-3.5-flash',
+      'gemini-flash-latest',
+      'gemini-3-flash-preview',
+      'gemini-3.7-flash',
+    ];
 
-  for (const model of models) {
-    try {
-      const isBearerToken = apiKey.startsWith('AQ.') || apiKey.startsWith('ya29.');
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    for (const model of models) {
+      try {
+        await limiter.acquireSlot();
+        const isOAuth = apiKey.startsWith('ya29.');
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent${
+          isOAuth ? '' : `?key=${apiKey}`
+        }`;
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      };
-
-      if (isBearerToken) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: `${systemPrompt}\n\nUser Question: ${userQuestion}\n\nInstructions: Analyze the retrieved knowledge chunks above and answer the user question directly, categorized clearly by Citizen Persona ("If you are a student...", "If you are a senior citizen...", "If you are an employed worker..."), with rich visual bullet points (• ), loan/grant amounts in Philippine Peso (₱), requirement checklists, and official link citations. Include an anti-fraud notice. No markdown asterisks (**).`,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1024,
-          },
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const candidate = data.candidates?.[0];
-        const rawText = candidate?.content?.parts?.[0]?.text;
-
-        if (rawText && rawText.trim().length > 10) {
-          return cleanMarkdownText(rawText);
+        const headers = { 'Content-Type': 'application/json' };
+        if (isOAuth) {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        } else {
+          headers['x-goog-api-key'] = apiKey;
         }
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `${systemPrompt}\n\n${userInstruction}` }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1400,
+            },
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const rawText =
+            data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+          if (rawText.trim().length > 20) {
+            return cleanMarkdownText(rawText);
+          }
+        } else if (response.status === 429) {
+          if (switchKeyToReserveIfAvailable('Rate limit')) {
+            apiKey = getApiKey();
+          }
+        }
+      } catch {
+        // Try next model
       }
-    } catch (err) {
-      // Continue to next model or fallback
     }
   }
 
-  // Fallback to deterministic grounded generator
-  return generateStructuredGroundedAnswer(cleanQ, contextOptions);
+  // 3. Grounded local fallback with full Philippine government knowledge synthesis
+  return generateStructuredGroundedAnswer(originalQuestion, { ...contextOptions, userDocs, opportunities });
 }
