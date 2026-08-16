@@ -25,15 +25,16 @@ export const Sidebar = () => {
     setAdminTab,
     reviewQueue,
     logout,
+    t,
   } = useApp();
 
   const citizenNav = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'explore', label: 'Explore', icon: Compass },
-    { id: 'ai-chat', label: 'ALALAY AI Chat', icon: Sparkles },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'chat-history', label: 'Chat Archives', icon: MessageSquare },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'home', label: t('nav.home'), icon: Home },
+    { id: 'explore', label: t('nav.explore'), icon: Compass },
+    { id: 'ai-chat', label: t('nav.aiChat'), icon: Sparkles },
+    { id: 'documents', label: t('nav.documents'), icon: FileText },
+    { id: 'chat-history', label: t('nav.chatArchives'), icon: MessageSquare },
+    { id: 'profile', label: t('nav.profile'), icon: User },
   ];
 
   const adminNav = [
@@ -111,7 +112,7 @@ export const Sidebar = () => {
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
         >
           <Settings className="w-4 h-4 text-slate-400" />
-          <span>Settings</span>
+          <span>{t('nav.settings')}</span>
         </button>
 
         <button
@@ -120,7 +121,7 @@ export const Sidebar = () => {
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4 text-rose-500" />
-          <span>Log Out</span>
+          <span>{t('nav.logOut')}</span>
         </button>
       </div>
     </aside>

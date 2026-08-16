@@ -46,13 +46,15 @@ export const DocumentUploadModal = () => {
 
   // Pre-fill the form when opened from a specific missing requirement (e.g. from a
   // checklist in chat or on the opportunity page), so the citizen doesn't have to
-  // re-select the document type manually.
+  // re-select the document type manually. Consumed immediately (cleared right after
+  // applying) so it can never linger and overwrite a later OCR preset/scan result.
   useEffect(() => {
     if (uploadModalOpen && uploadModalPrefill) {
       setDocName(uploadModalPrefill.name || '');
       setDocType(uploadModalPrefill.type || 'National ID / Gov ID');
+      setUploadModalPrefill(null);
     }
-  }, [uploadModalOpen, uploadModalPrefill]);
+  }, [uploadModalOpen, uploadModalPrefill, setUploadModalPrefill]);
 
   const documentTypes = [
     'National ID / Gov ID',
@@ -185,34 +187,21 @@ export const DocumentUploadModal = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('philsys')}
-              className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100/80 border border-blue-200 text-[#093a96] text-[11px] font-bold transition-all text-left truncate cursor-pointer shadow-2xs"
-            >
-              🇵🇭 PhilSys ID
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('indigency')}
-              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-900 text-[11px] font-bold transition-all text-left truncate cursor-pointer shadow-2xs"
-            >
-              📜 Brgy. Indigency
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('nbi')}
-              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-900 text-[11px] font-bold transition-all text-left truncate cursor-pointer shadow-2xs"
-            >
-              🛡️ NBI Clearance
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('medical')}
-              className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100/80 border border-purple-200 text-purple-900 text-[11px] font-bold transition-all text-left truncate cursor-pointer shadow-2xs"
-            >
-              🏥 Medical Cert
-            </button>
+            {[
+              { key: 'philsys', label: '🇵🇭 PhilSys ID', color: 'bg-blue-50 hover:bg-blue-100/80 border-blue-200 text-[#093a96]' },
+              { key: 'pwd_id', label: '♿ PWD ID', color: 'bg-indigo-50 hover:bg-indigo-100/80 border-indigo-200 text-indigo-900' },
+              { key: 'indigency', label: '📜 Brgy. Indigency', color: 'bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-900' },
+              { key: 'philhealth_mdr', label: '💊 PhilHealth MDR', color: 'bg-rose-50 hover:bg-rose-100/80 border-rose-200 text-rose-900' },
+            ].map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => handleSelectPreset(preset.key)}
+                className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all text-left truncate cursor-pointer shadow-2xs ${preset.color}`}
+              >
+                {preset.label}
+              </button>
+            ))}
           </div>
         </div>
 

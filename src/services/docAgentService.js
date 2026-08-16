@@ -22,6 +22,7 @@ export const STATUTORY_VALIDITY_DAYS = {
   'School Registration / COR': 120, // 1 Semester (~4 months)
   'National ID / Gov ID': 3650, // 10 years / Lifetime (PhilSys)
   'Birth Certificate (PSA)': 36500, // Permanent / No expiration
+  'PWD Identification Card': 1825, // 5 years (NCDA Standard)
 };
 
 // Document OCR Presets for instant realistic simulation
@@ -113,6 +114,133 @@ export const OCR_PRESET_TEMPLATES = {
     confidenceScore: 99.8,
     textClarity: 'Optimal (100%)',
   },
+  senior_osca: {
+    // Filed under the same 'National ID / Gov ID' type as PhilSys so it satisfies any
+    // "valid government ID" requirement, not just senior-exclusive ones.
+    type: 'National ID / Gov ID',
+    name: 'OSCA Senior Citizen ID',
+    issuer: 'Office for Senior Citizens Affairs (OSCA) - Quezon City',
+    documentNumber: 'OSCA-QC-2026-05512',
+    validityDays: 3650,
+    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      oscaId: 'OSCA-QC-2026-05512',
+      fullName: 'Adones Mendoza Santos',
+      birthDate: '1962-03-10',
+      barangay: 'Loyola Heights',
+      city: 'Quezon City',
+      statutoryBasis: 'Republic Act No. 9994 (Expanded Senior Citizens Act) & RA 10645',
+    },
+    confidenceScore: 99.0,
+    textClarity: 'Optimal (99%)',
+  },
+  pwd_id: {
+    type: 'National ID / Gov ID',
+    name: 'PWD Identification Card',
+    issuer: 'National Council on Disability Affairs (NCDA) / City PDAO',
+    documentNumber: 'PWD-QC-2026-11209',
+    validityDays: 1825,
+    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      pwdId: 'PWD-QC-2026-11209',
+      disabilityType: 'Orthopedic / Physical Disability',
+      statutoryBasis: 'Republic Act No. 10754 (PWD Statutory Discounts & VAT Exemption)',
+    },
+    confidenceScore: 98.9,
+    textClarity: 'High (98%)',
+  },
+  philhealth_mdr: {
+    type: 'PhilHealth MDR',
+    name: 'PhilHealth Member Data Record (MDR)',
+    issuer: 'Philippine Health Insurance Corporation (PhilHealth)',
+    documentNumber: 'PHIC-PIN-0219-8841-2207',
+    validityDays: 365,
+    thumbnail: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      philhealthPin: 'PHIC-PIN-0219-8841-2207',
+      memberStatus: 'Active / Contributing Member',
+      dependents: 'Registered Senior Parent Dependent',
+    },
+    confidenceScore: 98.4,
+    textClarity: 'High (98%)',
+  },
+  police_clearance: {
+    type: 'Police Clearance',
+    name: 'Philippine National Police Clearance',
+    issuer: 'Philippine National Police (PNP) Clearance System',
+    documentNumber: 'PNP-CLR-2026-77340',
+    validityDays: 180,
+    thumbnail: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      pnpReferenceNo: 'PNP-CLR-2026-77340',
+      statusRemarks: 'NO DEROGATORY RECORD / CLEAN',
+      purpose: 'Local Employment / Barangay Requirement',
+    },
+    confidenceScore: 98.1,
+    textClarity: 'Good (97%)',
+  },
+  coe: {
+    type: 'Certificate of Employment (COE)',
+    name: 'Certificate of Employment',
+    issuer: 'Human Resources Department, Private Employer',
+    documentNumber: 'COE-2026-40218',
+    validityDays: 180,
+    thumbnail: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      position: 'Rank-and-File Employee',
+      employmentStatus: 'Regular / Full-Time',
+      dateHired: '2021-06-14',
+    },
+    confidenceScore: 97.5,
+    textClarity: 'Good (97%)',
+  },
+  school_cor: {
+    type: 'School Registration / Transcript',
+    name: 'Certificate of Registration (COR)',
+    issuer: 'Office of the University Registrar',
+    documentNumber: 'COR-AY2026-2027-08841',
+    validityDays: 120,
+    thumbnail: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      schoolYear: 'AY 2026-2027, 1st Semester',
+      yearLevel: '2nd Year',
+      enrollmentStatus: 'Officially Enrolled',
+    },
+    confidenceScore: 97.9,
+    textClarity: 'Good (97%)',
+  },
+  csc_pds: {
+    // Government job applications (Personal Data Sheet, CSC Form 212), distinct from
+    // private-sector Certificate of Employment.
+    type: 'Certificate of Employment (COE)',
+    name: 'Personal Data Sheet (CSC Form 212)',
+    issuer: 'Civil Service Commission (CSC)',
+    documentNumber: 'CSC-PDS-2026-33017',
+    validityDays: 180,
+    thumbnail: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      formVersion: 'CS Form No. 212 (Revised 2017)',
+      applicantStatus: 'Duly Accomplished & Signed',
+      purpose: 'Government Employment Application',
+    },
+    confidenceScore: 98.0,
+    textClarity: 'Good (97%)',
+  },
+  csc_eligibility: {
+    type: 'Certificate of Employment (COE)',
+    name: 'CSC Civil Service Eligibility Certificate',
+    issuer: 'Civil Service Commission (CSC)',
+    documentNumber: 'CSC-ELIG-2026-90142',
+    validityDays: 36500,
+    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    attributes: {
+      eligibilityLevel: 'Professional (Career Service)',
+      examDate: '2024-10-06',
+      rating: '82.40%',
+    },
+    confidenceScore: 98.6,
+    textClarity: 'Optimal (99%)',
+  },
 };
 
 /**
@@ -127,14 +255,34 @@ export async function scanAndExtractDocumentMetadata(fileOrName, customFields = 
 
   let template = OCR_PRESET_TEMPLATES.philsys;
 
-  if (lower.includes('indigen') || lower.includes('barangay') || lower.includes('residency')) {
-    template = OCR_PRESET_TEMPLATES.indigency;
-  } else if (lower.includes('nbi') || lower.includes('clearance')) {
+  // Ordered most-specific-first so overlapping words (e.g. both NBI and Police clearances
+  // contain "clearance") resolve to the right template instead of always matching NBI.
+  if (lower.includes('police') || lower.includes('pnp')) {
+    template = OCR_PRESET_TEMPLATES.police_clearance;
+  } else if (lower.includes('nbi')) {
     template = OCR_PRESET_TEMPLATES.nbi;
-  } else if (lower.includes('medical') || lower.includes('abstract') || lower.includes('doctor') || lower.includes('hospital')) {
+  } else if (lower.includes('pwd') || lower.includes('disab')) {
+    template = OCR_PRESET_TEMPLATES.pwd_id;
+  } else if (lower.includes('senior') || lower.includes('osca')) {
+    template = OCR_PRESET_TEMPLATES.senior_osca;
+  } else if (lower.includes('philhealth') || lower.includes('mdr') || lower.includes('pmrf')) {
+    template = OCR_PRESET_TEMPLATES.philhealth_mdr;
+  } else if (lower.includes('indigen') || lower.includes('barangay') || lower.includes('residency')) {
+    template = OCR_PRESET_TEMPLATES.indigency;
+  } else if (lower.includes('medical') || lower.includes('abstract') || lower.includes('doctor') || lower.includes('hospital') || lower.includes('clinical')) {
     template = OCR_PRESET_TEMPLATES.medical;
   } else if (lower.includes('birth') || lower.includes('psa') || lower.includes('live birth')) {
     template = OCR_PRESET_TEMPLATES.psa_birth;
+  } else if (lower.includes('personal data sheet') || lower.includes('pds') || lower.includes('form 212')) {
+    template = OCR_PRESET_TEMPLATES.csc_pds;
+  } else if (lower.includes('eligibility') || lower.includes('csc')) {
+    template = OCR_PRESET_TEMPLATES.csc_eligibility;
+  } else if (lower.includes('employment') || lower.includes('coe')) {
+    template = OCR_PRESET_TEMPLATES.coe;
+  } else if (lower.includes('school') || lower.includes('cor') || lower.includes('enrollment') || lower.includes('registration') || lower.includes('transcript') || lower.includes('matriculation')) {
+    template = OCR_PRESET_TEMPLATES.school_cor;
+  } else if (lower.includes('clearance')) {
+    template = OCR_PRESET_TEMPLATES.nbi;
   }
 
   // Calculate Expiration Date

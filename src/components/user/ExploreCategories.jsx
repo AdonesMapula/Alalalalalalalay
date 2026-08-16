@@ -47,6 +47,7 @@ export const ExploreCategories = () => {
     documents,
     pinnedOpportunityIds,
     togglePinOpportunity,
+    t,
   } = useApp();
 
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
@@ -68,9 +69,9 @@ export const ExploreCategories = () => {
   };
 
   const eligibilityOptions = [
-    { id: 'all', label: '80%+ Matches' },
-    { id: 'Likely Eligible', label: 'Top Matches' },
-    { id: 'Needs Review', label: 'Needs Review' },
+    { id: 'all', label: t('explore.filter.all') },
+    { id: 'Likely Eligible', label: t('explore.filter.top') },
+    { id: 'Needs Review', label: t('explore.filter.needsReview') },
   ];
 
   // Dynamically rank all opportunities for this citizen
@@ -159,17 +160,17 @@ export const ExploreCategories = () => {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#1C1C1E] tracking-tight">
-              Explore Opportunities & Services
+              {t('explore.title')}
             </h1>
             <p className="text-xs sm:text-sm text-[#8E8E93] mt-1">
-              Discover verified Philippine government programs, statutory assistance, and live-scraped circulars
+              {t('explore.subtitle')}
             </p>
           </div>
 
           {isSenior && (
             <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-2xs">
               <Award className="w-4 h-4 text-amber-700" />
-              <span>Senior Citizen Match Filter Active ({userAge} yrs)</span>
+              <span>{t('explore.seniorFilterActive')} ({userAge} yrs)</span>
             </div>
           )}
         </div>
@@ -177,7 +178,7 @@ export const ExploreCategories = () => {
         <IOSSearchBar
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Search by benefit name, agency (PhilHealth, SSS, CHED, DOH, DepEd, OSCA), or keyword..."
+          placeholder={t('explore.searchPlaceholder')}
         />
       </div>
 
@@ -208,14 +209,14 @@ export const ExploreCategories = () => {
       {/* Eligibility Filter Switch */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="text-xs text-[#8E8E93] font-medium">
-          Showing <strong>{filteredOpportunities.length}</strong>{' '}
+          {t('explore.showing')} <strong>{filteredOpportunities.length}</strong>{' '}
           {showPinnedOnly
-            ? 'pinned services'
+            ? t('explore.pinnedServices')
             : selectedEligibilityFilter === 'Needs Review'
-              ? 'services to review'
+              ? t('explore.servicesToReview')
               : selectedEligibilityFilter === 'Likely Eligible'
-                ? 'services with a 90%+ match'
-                : 'services with an 80%+ match'}
+                ? t('explore.servicesTop')
+                : t('explore.servicesDefault')}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -230,7 +231,7 @@ export const ExploreCategories = () => {
             title="Show only services you've pinned for later"
           >
             <Pin className={`w-3.5 h-3.5 ${showPinnedOnly ? 'fill-amber-500 text-amber-600' : ''}`} />
-            <span>Pinned{pinnedOpportunityIds.length > 0 ? ` (${pinnedOpportunityIds.length})` : ''}</span>
+            <span>{t('explore.pinned')}{pinnedOpportunityIds.length > 0 ? ` (${pinnedOpportunityIds.length})` : ''}</span>
           </button>
 
           <IOSSegmentedControl
@@ -298,7 +299,7 @@ export const ExploreCategories = () => {
                             : 'bg-emerald-50 text-emerald-600 border-emerald-200/80'
                         }`}
                       >
-                        {opp.matchScore || 90}% Match
+                        {opp.matchScore || 90}% {t('common.match')}
                       </span>
                       <EligibilityStatusBadge status={opp.matchStatus || 'Likely Eligible'} />
                     </div>
@@ -327,7 +328,7 @@ export const ExploreCategories = () => {
                 <div className="pt-3 border-t border-[#F2F2F7] flex items-center justify-between text-xs text-[#8E8E93]">
                   <div className="flex items-center gap-1.5 font-medium">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                    <span>Citizen Charter</span>
+                    <span>{t('explore.citizenCharter')}</span>
                   </div>
 
                   {opp.totalDocCount > 0 && (
@@ -337,7 +338,7 @@ export const ExploreCategories = () => {
                   )}
 
                   <span className="text-[#007AFF] font-bold inline-flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
-                    View Service
+                    {t('explore.viewService')}
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>
@@ -351,12 +352,10 @@ export const ExploreCategories = () => {
             {showPinnedOnly ? <Pin className="w-6 h-6" /> : <Search className="w-6 h-6" />}
           </div>
           <h3 className="text-base font-bold text-[#1C1C1E]">
-            {showPinnedOnly ? 'No Pinned Services Yet' : 'No Matching Services Found'}
+            {showPinnedOnly ? t('explore.noResults.pinnedTitle') : t('explore.noResults.title')}
           </h3>
           <p className="text-xs text-[#8E8E93] max-w-sm mx-auto">
-            {showPinnedOnly
-              ? "Tap the pin icon on any service card to save it here for quick access later — even if you don't have the required document yet."
-              : 'No public services matched your search query. Try clearing filters or searching for another government program.'}
+            {showPinnedOnly ? t('explore.noResults.pinnedDesc') : t('explore.noResults.desc')}
           </p>
           <button
             type="button"
@@ -368,7 +367,7 @@ export const ExploreCategories = () => {
             }}
             className="px-4 py-2 rounded-xl bg-[#007AFF] text-white text-xs font-bold shadow-xs hover:bg-[#0066d6] cursor-pointer transition-colors"
           >
-            Reset Search Filters
+            {t('explore.resetFilters')}
           </button>
         </div>
       )}

@@ -4,14 +4,14 @@ import { useApp } from '../../context/AppContext';
 import aiLogoImg from '../../assets/AIlogos.png';
 
 export const BottomTabBar = () => {
-  const { activeTab, setActiveTab, openAskAlalay, unreadCount } = useApp();
+  const { activeTab, setActiveTab, openAskAlalay, unreadCount, t } = useApp();
 
   const tabs = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'explore', label: 'Explore', icon: Compass },
+    { id: 'home', label: t('nav.home'), icon: Home },
+    { id: 'explore', label: t('nav.explore'), icon: Compass },
     { id: 'assistant', label: 'ALALAY', icon: Sparkles, isAi: true },
-    { id: 'chat-history', label: 'Archives', icon: MessageSquare },
-    { id: 'documents', label: 'Docs', icon: FolderLock },
+    { id: 'chat-history', label: t('nav.tab.archives'), icon: MessageSquare },
+    { id: 'documents', label: t('nav.tab.docs'), icon: FolderLock },
   ];
 
   return (
@@ -33,7 +33,7 @@ export const BottomTabBar = () => {
                   <img src={aiLogoImg} alt="Ask AI" className="w-full h-full object-contain" />
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-[#5856D6] mt-1">Ask AI</span>
+              <span className="text-[10px] font-bold text-[#5856D6] mt-1">{t('nav.askAi')}</span>
             </button>
           );
         }

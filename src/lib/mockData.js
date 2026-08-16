@@ -508,6 +508,50 @@ export const OPPORTUNITIES = [
   }
 ];
 
+// Seeded on demand (via seedAutoApplyTestScenario in AppContext) so a citizen profile
+// can be steered to a genuine 100% match for testing the Auto-Apply feature end-to-end.
+// A true 100% match needs a demographic-specific bonus (senior/PWD/solo-parent) AND an
+// economic bonus (loan/emergency-work/indigent) AND full document coverage simultaneously —
+// no existing mock opportunity combines all three, hence this dedicated test program.
+export const AUTO_APPLY_TEST_OPPORTUNITY = {
+  id: 'opp_test_dswd_senior_pension',
+  title: 'DSWD Social Pension for Indigent Senior Citizens (RA 9994)',
+  agency: 'Department of Social Welfare and Development (DSWD)',
+  category: 'social',
+  categoryName: 'Social & Emergency Aid',
+  categoryColor: '#FF9500',
+  shortDesc: 'Monthly ₱1,000 cash stipend for indigent senior citizens aged 60 and above without a regular pension or income.',
+  fullDesc: 'Under Republic Act No. 9994 (Expanded Senior Citizens Act), indigent senior citizens without a regular monthly pension are entitled to a ₱1,000 monthly social pension released quarterly by DSWD through the local OSCA office.',
+  matchScore: 92,
+  matchStatus: 'Likely Eligible',
+  confidence: '99% Confident',
+  deadline: 'Open Year-Round',
+  isApproved: true,
+  benefits: [
+    '₱1,000 monthly social pension (released quarterly)',
+    'Automatic OSCA registration and 20% statutory discount enrollment',
+    'Priority lane at DSWD field offices and Malasakit Centers',
+  ],
+  whyYouQualify: [
+    { text: 'Filipino citizen aged 60 years old and above', status: 'met' },
+    { text: 'Indigent household with no regular pension or fixed income', status: 'met' },
+  ],
+  requirements: [
+    { name: 'OSCA Senior Citizen ID or Valid PhilSys National ID', status: 'met', sourceRef: 'DSWD Social Pension Guidelines' },
+    { name: 'Barangay Certificate of Indigency', status: 'met', sourceRef: 'DSWD Field Office Standards' },
+  ],
+  missingItems: [],
+  officialSource: {
+    agency: 'Department of Social Welfare and Development (DSWD)',
+    url: 'https://www.dswd.gov.ph',
+    pageTitle: 'DSWD Social Pension Program for Indigent Senior Citizens',
+    lastScrapedAt: '2026-08-15T08:00:00Z',
+    lastVerifiedAt: '2026-08-15T12:00:00Z',
+    sourceHash: 'sha256-test-senior-pension',
+    scraperConfidence: '99.0%',
+  },
+};
+
 export const KNOWLEDGE_SOURCES = [
   {
     id: 'src_philhealth',

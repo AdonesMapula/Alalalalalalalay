@@ -19,6 +19,7 @@ import {
   Award,
   Layers,
   ChevronRight,
+  FlaskConical,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSCard } from '../common/IOSCard';
@@ -41,6 +42,8 @@ export const DocumentsView = () => {
     setActiveDocumentForPreview,
     openAskAlalay,
     addToast,
+    generateAllTestDocuments,
+    t,
   } = useApp();
 
   const [filterTab, setFilterTab] = useState('all');
@@ -68,20 +71,20 @@ export const DocumentsView = () => {
     : 0;
 
   const filterOptions = [
-    { id: 'all', label: 'All Vault Files', count: auditedDocs.length },
+    { id: 'all', label: t('documents.filter.all'), count: auditedDocs.length },
     {
       id: 'valid',
-      label: 'Valid',
+      label: t('documents.valid'),
       count: validCount,
     },
     {
       id: 'expiring',
-      label: 'Expiring Soon',
+      label: t('documents.expiringSoon'),
       count: expiringCount,
     },
     {
       id: 'expired',
-      label: 'Expired',
+      label: t('documents.expired'),
       count: expiredCount,
     },
   ];
@@ -116,19 +119,19 @@ export const DocumentsView = () => {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              DocAgent Document Vault
+              {t('documents.title')}
             </h1>
             <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-[#093a96] text-[11px] font-black border border-blue-200 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
-              <span>AI Sentinel Active</span>
+              <span>{t('documents.sentinelActive')}</span>
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Autonomous OCR parsing, proactive expiration watchdog, and eligibility gap-filling
+            {t('documents.subtitle')}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleRunAudit}
@@ -136,7 +139,16 @@ export const DocumentsView = () => {
             className="px-3.5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isAuditing ? 'animate-spin text-[#093a96]' : ''}`} />
-            <span>{isAuditing ? 'Auditing...' : 'Run DocAgent Audit'}</span>
+            <span>{isAuditing ? t('documents.auditing') : t('documents.runAudit')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={generateAllTestDocuments}
+            title="Uploads one of every document type and updates your demo profile so at least one program reaches a genuine 100% match."
+            className="px-3.5 py-2.5 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+          >
+            <FlaskConical className="w-3.5 h-3.5" />
           </button>
 
           <IOSButton
@@ -146,7 +158,7 @@ export const DocumentsView = () => {
             onClick={() => setUploadModalOpen(true)}
             className="shadow-md shadow-blue-900/20"
           >
-            Upload with OCR
+            {t('documents.uploadWithOcr')}
           </IOSButton>
         </div>
       </div>
@@ -158,31 +170,31 @@ export const DocumentsView = () => {
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
               <h2 className="text-sm sm:text-base font-extrabold tracking-tight">
-                Vault Health & Eligibility Readiness
+                {t('documents.vaultHealth')}
               </h2>
             </div>
             <p className="text-xs text-blue-200">
-              {validCount} of {auditedDocs.length} documents fully compliant • Cross-referenced with statutory charters
+              {validCount} of {auditedDocs.length} {t('documents.compliant')}
             </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
             <div className="px-3 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs font-bold">{validCount} Valid</span>
+              <span className="text-xs font-bold">{validCount} {t('documents.valid')}</span>
             </div>
 
             {expiringCount > 0 && (
               <div className="px-3 py-1.5 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-amber-300 flex items-center gap-2">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span className="text-xs font-bold">{expiringCount} Expiring Soon</span>
+                <span className="text-xs font-bold">{expiringCount} {t('documents.expiringSoon')}</span>
               </div>
             )}
 
             {expiredCount > 0 && (
               <div className="px-3 py-1.5 rounded-2xl bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5" />
-                <span className="text-xs font-bold">{expiredCount} Expired</span>
+                <span className="text-xs font-bold">{expiredCount} {t('documents.expired')}</span>
               </div>
             )}
           </div>
@@ -191,8 +203,8 @@ export const DocumentsView = () => {
         {/* Readiness Progress Bar */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs font-bold text-blue-200">
-            <span>Overall Document Compliance Score</span>
-            <span className="text-emerald-400 font-extrabold">{readinessScore}% Ready</span>
+            <span>{t('documents.complianceScore')}</span>
+            <span className="text-emerald-400 font-extrabold">{readinessScore}% {t('documents.ready')}</span>
           </div>
           <div className="w-full h-2 bg-white/15 rounded-full overflow-hidden">
             <div
@@ -326,7 +338,7 @@ export const DocumentsView = () => {
 
         <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
           <Lock className="w-3.5 h-3.5 text-emerald-600" />
-          <span>AES-256 Vault Encryption • 100% RLS Protected</span>
+          <span>{t('documents.encryption')}</span>
         </div>
       </div>
 
@@ -424,7 +436,7 @@ export const DocumentsView = () => {
                   className="text-xs font-bold text-[#093a96] hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Eye className="w-3.5 h-3.5" />
-                  <span>Preview</span>
+                  <span>{t('documents.preview')}</span>
                 </button>
 
                 <div className="flex items-center gap-1.5">
@@ -436,7 +448,7 @@ export const DocumentsView = () => {
                       title="Prepare Renewal Packet"
                     >
                       <RefreshCw className="w-3 h-3" />
-                      <span>Renew</span>
+                      <span>{t('documents.renew')}</span>
                     </button>
                   )}
                   <button
@@ -461,9 +473,9 @@ export const DocumentsView = () => {
             <FolderLock className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-extrabold text-slate-800">No Documents Found</h3>
+            <h3 className="text-base font-extrabold text-slate-800">{t('documents.noDocsTitle')}</h3>
             <p className="text-xs text-slate-500 leading-relaxed font-medium">
-              Upload your PhilSys ID, Barangay Indigency, or clearances to unlock automatic verification across government programs.
+              {t('documents.noDocsDesc')}
             </p>
           </div>
           <IOSButton
@@ -473,7 +485,7 @@ export const DocumentsView = () => {
             onClick={() => setUploadModalOpen(true)}
             className="mx-auto shadow-md shadow-blue-900/20"
           >
-            Upload with OCR
+            {t('documents.uploadWithOcr')}
           </IOSButton>
         </div>
       )}

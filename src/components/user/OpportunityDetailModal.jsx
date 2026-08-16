@@ -381,54 +381,25 @@ export const OpportunityDetailModal = () => {
               </div>
             </div>
 
-            {/* Matchmaking Algorithm Dimensions Breakdown Card */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-white border border-blue-100/90 shadow-sm space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 text-[#093a96] flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs sm:text-sm font-extrabold text-[#0f172a] uppercase tracking-wider">
-                      How Matchmaking Scoring Works
-                    </h3>
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Multi-factor deterministic evaluation across 4 statutory dimensions (0 - 100%):
-                    </p>
-                  </div>
+            {/* Calculated Match Score — full scoring methodology is published on the landing page */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-white border border-blue-100/90 shadow-sm flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-blue-100 text-[#093a96] flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5" />
                 </div>
-
-                <span className="text-xs font-black text-[#093a96] bg-blue-50 px-3 py-1 rounded-full border border-blue-200 shadow-2xs">
-                  Calculated Score: {matchedOpp.matchScore || 90}%
-                </span>
-              </div>
-
-              {/* 4 Transparent Dimension Gauges */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🎯 Demographics</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.demographicScore || 35}/40 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">Age, Seniority (RA 9994), PWD, Solo Parent</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">💼 Economic Profile</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.economicScore || 20}/25 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">Employment, SSS credits, indigent classification</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📁 Locker Fulfillment</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.documentScore || 15}/25 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">{matchedOpp.matchedDocCount || 0} of {matchedOpp.totalDocCount || 0} required docs in vault</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🇵🇭 Citizenship Mandate</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.citizenshipScore || 10}/10 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">Philippine statutory entitlement (RA 11032)</p>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-extrabold text-[#0f172a] uppercase tracking-wider">
+                    Calculated Match Score
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Based on your profile, documents, and this program's requirements.
+                  </p>
                 </div>
               </div>
+
+              <span className="text-sm font-black text-[#093a96] bg-blue-50 px-4 py-1.5 rounded-full border border-blue-200 shadow-2xs">
+                {matchedOpp.matchScore || 90}%
+              </span>
             </div>
 
             {/* Program Overview & Scraped Citizen Information */}

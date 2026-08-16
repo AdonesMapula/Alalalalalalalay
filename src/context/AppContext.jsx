@@ -30,6 +30,8 @@ import {
 import { runFacebookSyncPipeline } from '../services/facebookScraper';
 import { scrapeAnyWebsite } from '../services/webScraper';
 import { rankAndFilterOpportunities, getAutoApplyMatches } from '../services/rulesEngine';
+import { OCR_PRESET_TEMPLATES } from '../services/docAgentService';
+import { translate } from '../lib/translations';
 import {
   INITIAL_USER,
   INITIAL_DOCUMENTS,
@@ -40,6 +42,7 @@ import {
   NOTIFICATIONS,
   AUDIT_LOGS,
   INITIAL_CHAT_ARCHIVES,
+  AUTO_APPLY_TEST_OPPORTUNITY,
 } from '../lib/mockData';
 
 const AppContext = createContext();
@@ -60,6 +63,49 @@ function guessDocumentTypeFromRequirement(requirementName = '') {
   return 'National ID / Gov ID';
 }
 
+// Collapses opportunities that share the same title (case/whitespace-insensitive) — e.g.
+// repeated scraping runs or admin re-adds can leave near-duplicate cards behind, sometimes
+// with an incorrect agency label attached. When duplicates disagree on agency, keeps
+// whichever agency value is most common among them (majority vote), tie-breaking to the
+// first-seen entry, rather than arbitrarily keeping whichever happened to scrape last.
+function dedupeOpportunitiesByTitle(list = []) {
+  const groups = new Map();
+
+  list.forEach((opp) => {
+    const key = (opp?.title || '').toLowerCase().trim();
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(opp);
+  });
+
+  const deduped = [];
+  groups.forEach((group) => {
+    if (group.length === 1) {
+      deduped.push(group[0]);
+      return;
+    }
+
+    const agencyCounts = new Map();
+    group.forEach((o) => {
+      const agency = (o.agency || '').trim();
+      agencyCounts.set(agency, (agencyCounts.get(agency) || 0) + 1);
+    });
+
+    let bestAgency = group[0].agency;
+    let bestCount = 0;
+    agencyCounts.forEach((count, agency) => {
+      if (count > bestCount) {
+        bestCount = count;
+        bestAgency = agency;
+      }
+    });
+
+    deduped.push(group.find((o) => (o.agency || '').trim() === bestAgency) || group[0]);
+  });
+
+  return deduped;
+}
+
 export const AppProvider = ({ children }) => {
   // Navigation & View Mode
   const [viewMode, setViewMode] = useState(() => {
@@ -68,6 +114,17 @@ export const AppProvider = ({ children }) => {
   });
   const [activeTab, setActiveTab] = useState('home');
   const [adminTab, setAdminTab] = useState('sources');
+
+  // Language: 'en' (default) or 'fil'
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('alalay_language') || 'en';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('alalay_language', language);
+  }, [language]);
+
+  const t = (key) => translate(language, key);
 
   // Dynamic User & Auth State (Persistent across all page refreshes)
   const [user, setUser] = useState(() => {
@@ -152,12 +209,20 @@ export const AppProvider = ({ children }) => {
 
   const [opportunities, setOpportunities] = useState(() => {
     const saved = localStorage.getItem('alalay_opportunities');
-    return saved ? JSON.parse(saved) : OPPORTUNITIES;
+    return dedupeOpportunitiesByTitle(saved ? JSON.parse(saved) : OPPORTUNITIES);
   });
 
-  // Auto-Apply queue: opportunities the AI has detected as a 100% match under the
-  // citizen's Auto-Apply settings, staged as "Ready to Submit" until the citizen taps
-  // Submit — auto-apply prepares everything but never submits government paperwork on its own.
+  // One-time cleanup: if the loaded vault had duplicate-titled opportunities (e.g. from
+  // repeated scraping), persist the deduped result so the fix survives past this session
+  // instead of only living in memory until the next scrape re-triggers a save.
+  useEffect(() => {
+    localStorage.setItem('alalay_opportunities', JSON.stringify(opportunities));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-Apply queue: opportunities the AI has detected as a 95%+ "Likely Eligible" match
+  // under the citizen's Auto-Apply settings, staged as "Ready to Submit" until the citizen
+  // taps Submit (unless Full Automation consent was given — see autoApplyMode).
   const [autoApplyQueue, setAutoApplyQueue] = useState(() => {
     try {
       const saved = localStorage.getItem('alalay_auto_apply_queue');
@@ -171,10 +236,15 @@ export const AppProvider = ({ children }) => {
     localStorage.setItem('alalay_auto_apply_queue', JSON.stringify(autoApplyQueue));
   }, [autoApplyQueue]);
 
-  // Continuously scan for new 100%-match opportunities whenever documents, the
-  // opportunity catalog, or the citizen's Auto-Apply settings change.
+  // Continuously scan for new strong-match (95%+, Likely Eligible) opportunities whenever documents, the
+  // opportunity catalog, or the citizen's Auto-Apply settings change. Behavior depends
+  // on the consent-gated autoApplyMode: 'confirm' (default) stages matches for the
+  // citizen to manually tap Submit; 'autonomous' (only reachable after explicit consent)
+  // marks them Applied immediately and just notifies.
   useEffect(() => {
     if (!user?.autoApplyEnabled) return;
+
+    const isAutonomous = user?.autoApplyMode === 'autonomous' && user?.autoApplyConsentGiven;
 
     const ranked = rankAndFilterOpportunities(opportunities, user, documents);
     const eligible = getAutoApplyMatches(ranked, user);
@@ -187,21 +257,41 @@ export const AppProvider = ({ children }) => {
 
       newlyEligible.forEach((opp) => {
         addToast(
-          '🎯 100% Match Found',
-          `${opp.title} is fully ready — review and submit it from your Auto-Apply queue.`,
+          isAutonomous ? '🤖 Auto-Applied' : '🎯 Strong Match Found',
+          isAutonomous
+            ? `${opp.title} was a ${opp.matchScore}% Likely Eligible match — ALALAY submitted it automatically on your behalf.`
+            : `${opp.title} is a ${opp.matchScore}% Likely Eligible match — review and submit it from your Auto-Apply queue.`,
           'success'
         );
       });
 
+      const now = new Date().toISOString();
       const newEntries = newlyEligible.map((opp) => ({
         oppId: opp.id,
-        status: 'ready_to_submit',
-        queuedAt: new Date().toISOString(),
+        status: isAutonomous ? 'applied' : 'ready_to_submit',
+        queuedAt: now,
+        ...(isAutonomous ? { appliedAt: now } : {}),
       }));
 
       return [...newEntries, ...prev];
     });
-  }, [user?.autoApplyEnabled, user?.autoApplyCategories, user?.autoApplyIncludeJobs, opportunities, documents]);
+  }, [user?.autoApplyEnabled, user?.autoApplyCategories, user?.autoApplyIncludeJobs, user?.autoApplyMode, user?.autoApplyConsentGiven, opportunities, documents]);
+
+  // Switching into Full Automation should resolve anything already sitting in the
+  // "Ready to Submit" queue from before the switch — otherwise those stale entries
+  // still wait on a manual tap even though the citizen just consented to autonomy.
+  useEffect(() => {
+    const isAutonomous = user?.autoApplyMode === 'autonomous' && user?.autoApplyConsentGiven;
+    if (!isAutonomous) return;
+
+    setAutoApplyQueue((prev) => {
+      if (!prev.some((entry) => entry.status === 'ready_to_submit')) return prev;
+      const now = new Date().toISOString();
+      return prev.map((entry) =>
+        entry.status === 'ready_to_submit' ? { ...entry, status: 'applied', appliedAt: now } : entry
+      );
+    });
+  }, [user?.autoApplyMode, user?.autoApplyConsentGiven]);
 
   const submitAutoApply = (oppId) => {
     const opp = opportunities.find((o) => o.id === oppId);
@@ -215,6 +305,59 @@ export const AppProvider = ({ children }) => {
 
   const dismissAutoApply = (oppId) => {
     setAutoApplyQueue((prev) => prev.filter((entry) => entry.oppId !== oppId));
+  };
+
+  const clearAutoApplyHistory = () => {
+    setAutoApplyQueue((prev) => prev.filter((entry) => entry.status !== 'applied'));
+  };
+
+  // Dev/demo helper: one click uploads every known document type to the vault, seeds a
+  // matching opportunity, and sets the minimum demographic profile (senior + indigent)
+  // needed for matchScore to genuinely reach 100 — so Auto-Apply can be tested end-to-end
+  // without relying on production data ever producing a perfect match by chance.
+  const generateAllTestDocuments = () => {
+    setOpportunities((prev) => {
+      if (prev.some((o) => o.id === AUTO_APPLY_TEST_OPPORTUNITY.id)) return prev;
+      const updated = [AUTO_APPLY_TEST_OPPORTUNITY, ...prev];
+      localStorage.setItem('alalay_opportunities', JSON.stringify(updated));
+      return updated;
+    });
+
+    const existingNames = new Set(documents.map((d) => (d.name || '').toLowerCase()));
+
+    Object.values(OCR_PRESET_TEMPLATES).forEach((template) => {
+      if (existingNames.has(template.name.toLowerCase())) return;
+      const expDateObj = new Date(Date.now() + (template.validityDays || 180) * 24 * 60 * 60 * 1000);
+      uploadNewDocument(
+        {
+          name: template.name,
+          type: template.type,
+          issuer: template.issuer,
+          documentNumber: template.documentNumber,
+          expirationDate: expDateObj.toISOString().split('T')[0],
+          thumbnail: template.thumbnail,
+          attributes: template.attributes,
+        },
+        { silent: true }
+      );
+    });
+
+    // Note: deliberately does NOT touch autoApplyEnabled/autoApplyConsentGiven — Auto-Apply
+    // stays off by default and can only be turned on through its own consent flow in Profile,
+    // even from this one-click test helper.
+    setUser((prev) => ({
+      ...prev,
+      isSeniorCitizen: true,
+      birthDate: '1962-03-10',
+      monthlyIncome: 'Below ₱15,000 (No Regular Income)',
+      autoApplyCategories: Array.from(new Set([...(prev.autoApplyCategories || []), 'social'])),
+    }));
+
+    addToast(
+      '🧪 All Test Documents Generated',
+      'Uploaded one of every document type to your vault and updated your demo profile so at least one program hits a genuine 100% match. Enable Auto-Apply in Profile to test the queue.',
+      'success'
+    );
   };
 
   const [sources, setSources] = useState(() => {
@@ -387,8 +530,11 @@ export const AppProvider = ({ children }) => {
       // C. Fetch Dynamic Opportunities directly from Supabase (Single Source of Truth)
       const { data: dbOpps } = await fetchOpportunities();
       if (dbOpps && Array.isArray(dbOpps)) {
-        setOpportunities(dbOpps);
-        localStorage.setItem('alalay_opportunities', JSON.stringify(dbOpps));
+        // Supabase itself can carry duplicate-titled rows from repeated scraping —
+        // dedupe on read so the client never displays or auto-applies to them.
+        const dedupedDbOpps = dedupeOpportunitiesByTitle(dbOpps);
+        setOpportunities(dedupedDbOpps);
+        localStorage.setItem('alalay_opportunities', JSON.stringify(dedupedDbOpps));
       }
 
       // D. Fetch Dynamic Audit Logs
@@ -977,10 +1123,12 @@ export const AppProvider = ({ children }) => {
     setOnboardingCompleted(false);
     setUser(null);
     setDocuments([]);
+    setLanguage('en');
     localStorage.setItem('alalay_auth', 'false');
     localStorage.setItem('alalay_onboarding_done', 'false');
     localStorage.removeItem('alalay_user');
     localStorage.removeItem('alalay_documents');
+    localStorage.setItem('alalay_language', 'en');
     addToast('Logged Out', 'You have been signed out.', 'info');
   };
 
@@ -1536,9 +1684,9 @@ export const AppProvider = ({ children }) => {
     addToast('Archive Removed', 'Consultation deleted from your chat history.', 'info');
   };
 
-  const uploadNewDocument = (docData) => {
+  const uploadNewDocument = (docData, { silent = false } = {}) => {
     const newDoc = {
-      id: docData.id || `doc_${Date.now()}`,
+      id: docData.id || `doc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       name: docData.name,
       type: docData.type || 'Identity Card',
       issuer: docData.issuer || 'Authorized Government Agency',
@@ -1559,7 +1707,9 @@ export const AppProvider = ({ children }) => {
       return updated;
     });
 
-    addToast('Vault Updated', `Added ${newDoc.name} to your encrypted digital vault.`, 'success');
+    if (!silent) {
+      addToast('Vault Updated', `Added ${newDoc.name} to your encrypted digital vault.`, 'success');
+    }
   };
 
   const replaceDocument = (docId, updatedFields = {}) => {
@@ -1626,6 +1776,9 @@ export const AppProvider = ({ children }) => {
         setActiveTab,
         adminTab,
         setAdminTab,
+        language,
+        setLanguage,
+        t,
         // User & Dynamic Auth
         isAuthenticated,
         setIsAuthenticated,
@@ -1656,6 +1809,8 @@ export const AppProvider = ({ children }) => {
         autoApplyQueue,
         submitAutoApply,
         dismissAutoApply,
+        clearAutoApplyHistory,
+        generateAllTestDocuments,
         opportunities,
         categories: CATEGORIES,
         sources,

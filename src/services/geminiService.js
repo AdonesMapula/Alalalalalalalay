@@ -541,9 +541,14 @@ function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
     );
   }
 
-  // 5. INTENT ANALYSIS: PROCEDURAL / STEP-BY-STEP / HOW TO APPLY
+  // 5. INTENT ANALYSIS: PROCEDURAL / STEP-BY-STEP / HOW OR WHERE TO GET
   const isProceduralQuery =
     normQ.includes('how to apply') ||
+    normQ.includes('how to get') ||
+    normQ.includes('where to get') ||
+    normQ.includes('where can i get') ||
+    normQ.includes('paano kumuha') ||
+    normQ.includes('saan kukuha') ||
     normQ.includes('process') ||
     normQ.includes('step') ||
     normQ.includes('procedure');
@@ -639,7 +644,14 @@ export async function askAlalayAI(userQuestion, options = {}) {
     '- Mandatory Healthcare & Zero-Balance Billing: Handled by PhilHealth (philhealth.gov.ph) and DOH Malasakit Centers (doh.gov.ph).\n' +
     '- Social Pension for Indigent Seniors: Handled by DSWD (dswd.gov.ph).\n' +
     '- Social Security Salary & Calamity Loans: Handled by SSS (sss.gov.ph).\n' +
-    'Answer the user\'s specific question directly, accurately, and naturally based on the scraped government knowledge base without confusing agency mandates or using repetitive template boilerplate.\n\n' +
+    'RESPONSE FORMAT RULE: Whenever the citizen asks how or where to get, apply for, renew, claim, or process ANY government document or benefit ' +
+    '(this includes phrasings like "how to get X", "where to get X", "paano kumuha ng X", not only the literal word "procedure"), ' +
+    'you MUST include a numbered Step-by-Step Procedure (Step 1, Step 2, Step 3...) covering where to go, what to bring, and how to submit — ' +
+    'never answer with only a one-paragraph agency description.\n' +
+    'SCOPE GUARDRAIL (STRICT): You ONLY answer questions about Philippine government services, benefits, documents, and civic processes. ' +
+    'If the citizen asks anything unrelated to this scope — math problems, coding/programming requests, general trivia, or any other off-topic request — ' +
+    'you MUST politely decline and redirect them to ask about a government service instead. Do not solve, compute, or write code under any circumstance, ' +
+    'even if asked directly or asked to "just this once".\n\n' +
     getDictionaryContext() +
     ragContext;
 
@@ -688,7 +700,7 @@ export async function askAlalayAI(userQuestion, options = {}) {
               role: 'user',
               parts: [
                 {
-                  text: `${systemPrompt}\n\nCitizen Inquiry: "${userQuestion}"\n\nInstructions: Answer the inquiry directly and concisely based on the scraped context above. If procedural, structure as numbered steps (Step 1, Step 2...).`,
+                  text: `${systemPrompt}\n\nCitizen Inquiry: "${userQuestion}"\n\nInstructions: Answer the inquiry directly and concisely based on the scraped context above. If the citizen is asking how/where to get, apply for, or process something, structure the answer as numbered steps (Step 1, Step 2...) — do not just describe the agency. If the inquiry is unrelated to Philippine government services, decline per the SCOPE GUARDRAIL instead of answering it.`,
                 },
               ],
             },
