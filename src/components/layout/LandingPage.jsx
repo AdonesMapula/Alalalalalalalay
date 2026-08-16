@@ -65,7 +65,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0f172a] leading-[1.15]">
               Government services made{' '}
-              <span className="text-[#093a96] underline decoration-blue-200 decoration-wavy decoration-2">
+              <span className="text-[#093a96] underline ">
                 understandable
               </span>{' '}
               and{' '}
@@ -209,7 +209,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
       <section className="border-y border-slate-200/80 bg-white py-8 px-6">
         <div className="max-w-7xl mx-auto text-center space-y-4">
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            VERIFIED INFORMATION SCRAPED FROM
+            VERIFIED INFORMATION FROM
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16 text-slate-700 font-bold text-sm">
