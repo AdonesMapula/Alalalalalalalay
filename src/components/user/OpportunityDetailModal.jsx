@@ -31,80 +31,15 @@ import { useApp } from '../../context/AppContext';
 import { IOSButton } from '../common/IOSButton';
 import { askAlalayAI } from '../../services/geminiService';
 import { matchOpportunityForCitizen, matchRequirementWithUserDoc } from '../../services/rulesEngine';
-import logoImg from '../../assets/logos.png';
+import logoImg from '../../assets/AIlogos.png';
+
+import { AiMessageRenderer } from '../common/AiMessageRenderer';
 
 /**
- * Message Formatter for Side AI Chat with Smooth Staggered Text Transitions
+ * Message Formatter for Side AI Chat with Card-Based Stepper & Interactive Deck
  */
 const SideAiMessageRenderer = ({ text, sourceUrl }) => {
-  if (!text) return null;
-  const lines = text.split('\n');
-
-  return (
-    <div className="space-y-2 text-xs leading-relaxed text-slate-800">
-      {lines.map((line, idx) => {
-        const raw = line.trim();
-        if (!raw) return null;
-
-        if (raw.startsWith('###') || raw.startsWith('##') || raw.endsWith(':')) {
-          return (
-            <div
-              key={idx}
-              style={{ animationDelay: `${idx * 45}ms` }}
-              className="animate-text-stagger font-bold text-[#093a96] text-xs pt-1 flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3 h-3 text-blue-600 flex-shrink-0" />
-              <span>{raw.replace(/^#+\s*/, '')}</span>
-            </div>
-          );
-        }
-
-        if (raw.startsWith('•') || raw.startsWith('-') || raw.startsWith('*')) {
-          return (
-            <div
-              key={idx}
-              style={{ animationDelay: `${idx * 45}ms` }}
-              className="animate-text-stagger flex items-start gap-1.5 pl-1.5 text-slate-700"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] mt-1.5 flex-shrink-0" />
-              <span>{raw.replace(/^[•\-\*]\s*/, '')}</span>
-            </div>
-          );
-        }
-
-        return (
-          <p
-            key={idx}
-            style={{ animationDelay: `${idx * 45}ms` }}
-            className="animate-text-stagger leading-relaxed"
-          >
-            {raw}
-          </p>
-        );
-      })}
-
-      {sourceUrl && (
-        <div
-          style={{ animationDelay: `${lines.length * 45}ms` }}
-          className="animate-text-stagger pt-2 mt-2 border-t border-blue-100/80 flex items-center justify-between text-[10px] text-slate-500"
-        >
-          <span className="flex items-center gap-1 font-semibold text-emerald-700">
-            <ShieldCheck className="w-3 h-3 text-emerald-600" />
-            <span>Charter Citation</span>
-          </span>
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#093a96] font-bold hover:underline inline-flex items-center gap-0.5"
-          >
-            <span>{sourceUrl.replace(/^https?:\/\//, '').split('/')[0]}</span>
-            <ExternalLink className="w-2.5 h-2.5" />
-          </a>
-        </div>
-      )}
-    </div>
-  );
+  return <AiMessageRenderer text={text} sourceUrl={sourceUrl} size="sm" />;
 };
 
 export const OpportunityDetailModal = () => {
@@ -770,8 +705,8 @@ export const OpportunityDetailModal = () => {
                     className={`animate-message-pop flex gap-2 ${isAi ? 'justify-start' : 'justify-end'}`}
                   >
                     {isAi && (
-                      <div className="w-6 h-6 rounded-full bg-[#093a96] text-white flex items-center justify-center flex-shrink-0 mt-1 shadow-2xs">
-                        <Bot className="w-3.5 h-3.5" />
+                      <div className="w-6 h-6 rounded-full bg-white border border-blue-200 p-0.5 flex items-center justify-center flex-shrink-0 mt-1 shadow-2xs">
+                        <img src={logoImg} alt="ALALAY AI" className="w-full h-full object-contain" />
                       </div>
                     )}
 
@@ -802,8 +737,8 @@ export const OpportunityDetailModal = () => {
 
               {isSideTyping && (
                 <div className="flex gap-2 justify-start items-center">
-                  <div className="w-6 h-6 rounded-full bg-[#093a96] text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
-                    <Bot className="w-3.5 h-3.5" />
+                  <div className="w-6 h-6 rounded-full bg-white border border-blue-200 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                    <img src={logoImg} alt="ALALAY AI" className="w-full h-full object-contain animate-bounce" />
                   </div>
                   <div className="p-3 rounded-2xl bg-white border border-slate-200 text-slate-500 shadow-2xs flex items-center gap-1.5 text-xs font-semibold">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] animate-bounce" />

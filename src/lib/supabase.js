@@ -1,13 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl =
-  import.meta.env.VITE_SUPABASE_URL || 'https://kejkhhnouwdrcmifgkzb.supabase.co';
-const supabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const getEnvVar = (key, fallback = '') => {
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+    return import.meta.env[key];
+  }
+  if (typeof process !== 'undefined' && process.env && process.env[key]) {
+    return process.env[key];
+  }
+  return fallback;
+};
 
-export const isSupabaseConfigured = Boolean(
-  import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', 'https://kejkhhnouwdrcmifgkzb.supabase.co');
+const supabaseAnonKey = getEnvVar(
+  'VITE_SUPABASE_ANON_KEY',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtlamtoaG5vdXdkcmNtaWZna3piIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY2MDEzNDEsImV4cCI6MjEwMjE3NzM0MX0.Wnw_pTEC7ck-aVPKkci16O7B6YZapLURfJnF1GTsVls'
 );
+
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 // Create live Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

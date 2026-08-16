@@ -135,13 +135,13 @@ const MainAppContent = () => {
           {/* Dynamic Tab Router */}
           <main
             className={`flex-1 min-h-0 ${activeTab === 'ai-chat'
-                ? 'px-4 sm:px-6 pb-3 overflow-hidden flex flex-col'
-                : 'px-6 sm:px-10 pb-20 md:pb-10 overflow-y-auto'
+              ? 'px-4 sm:px-6 pb-3 overflow-hidden flex flex-col'
+              : 'px-6 sm:px-10 pb-20 md:pb-10 overflow-y-auto'
               }`}
           >
             {activeTab === 'home' && <HomeDashboard />}
             {activeTab === 'explore' && <ExploreCategories />}
-            {/* {activeTab === 'ai-chat' && <AskAlalayPageView />} */}
+            {activeTab === 'ai-chat' && <AskAlalayPageView />}
             {activeTab === 'documents' && <DocumentsView />}
             {activeTab === 'chat-history' && <ChatArchivesView />}
             {activeTab === 'notifications' && <NotificationsView />}

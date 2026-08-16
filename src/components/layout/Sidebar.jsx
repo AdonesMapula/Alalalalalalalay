@@ -30,7 +30,7 @@ export const Sidebar = () => {
   const citizenNav = [
     { id: 'home', label: 'Home', icon: Home },
     { id: 'explore', label: 'Explore', icon: Compass },
-    // { id: 'ai-chat', label: 'ALALAY AI Chat', icon: Sparkles },
+    { id: 'ai-chat', label: 'ALALAY AI Chat', icon: Sparkles },
     { id: 'documents', label: 'Documents', icon: FileText },
     { id: 'chat-history', label: 'Chat Archives', icon: MessageSquare },
     { id: 'profile', label: 'Profile', icon: User },
@@ -63,8 +63,8 @@ export const Sidebar = () => {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${isActive
-                      ? 'bg-[#093a96] text-white shadow-md shadow-blue-900/20 font-bold'
-                      : 'text-slate-600 hover:text-[#093a96] hover:bg-slate-50'
+                    ? 'bg-[#093a96] text-white shadow-md shadow-blue-900/20 font-bold'
+                    : 'text-slate-600 hover:text-[#093a96] hover:bg-slate-50'
                     }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
@@ -83,8 +83,8 @@ export const Sidebar = () => {
                   type="button"
                   onClick={() => setAdminTab(item.id)}
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${isActive
-                      ? 'bg-slate-900 text-white shadow-sm font-bold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'bg-slate-900 text-white shadow-sm font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                 >
                   <div className="flex items-center gap-3">

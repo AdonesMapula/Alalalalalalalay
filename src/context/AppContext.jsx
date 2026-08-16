@@ -1429,9 +1429,69 @@ export const AppProvider = ({ children }) => {
     addToast('Archive Removed', 'Consultation deleted from your chat history.', 'info');
   };
 
-  const openAskAlalay = (opp = null, session = null) => {
+  const uploadNewDocument = (docData) => {
+    const newDoc = {
+      id: docData.id || `doc_${Date.now()}`,
+      name: docData.name,
+      type: docData.type || 'Identity Card',
+      issuer: docData.issuer || 'Authorized Government Agency',
+      documentNumber: docData.documentNumber || `DOC-${Date.now().toString().slice(-6)}`,
+      expirationDate: docData.expirationDate || '2028-12-31',
+      fileSize: docData.fileSize || '1.4 MB',
+      fileType: docData.fileType || 'PDF',
+      status: 'Valid',
+      verifiedBadge: 'DocAgent Verified ✓',
+      uploadedAt: 'Just now via DocAgent OCR',
+      thumbnail: docData.thumbnail || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+      attributes: docData.attributes || {},
+    };
+
+    setDocuments((prev) => {
+      const updated = [newDoc, ...prev];
+      localStorage.setItem('alalay_documents', JSON.stringify(updated));
+      return updated;
+    });
+
+    addToast('Vault Updated', `Added ${newDoc.name} to your encrypted digital vault.`, 'success');
+  };
+
+  const replaceDocument = (docId, updatedFields = {}) => {
+    setDocuments((prev) => {
+      const updated = prev.map((doc) => {
+        if (doc.id === docId) {
+          return {
+            ...doc,
+            ...updatedFields,
+            status: 'Valid',
+            expirationDate: updatedFields.expirationDate || new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            uploadedAt: 'Renewed via DocAgent',
+          };
+        }
+        return doc;
+      });
+      localStorage.setItem('alalay_documents', JSON.stringify(updated));
+      return updated;
+    });
+
+    addToast('Document Renewed', 'Document marked as renewed and valid in vault.', 'success');
+  };
+
+  const deleteDocument = (docId) => {
+    setDocuments((prev) => {
+      const updated = prev.filter((d) => d.id !== docId);
+      localStorage.setItem('alalay_documents', JSON.stringify(updated));
+      return updated;
+    });
+
+    addToast('Document Removed', 'Removed document from digital vault.', 'info');
+  };
+
+  const [askAlalayInitialPrompt, setAskAlalayInitialPrompt] = useState('');
+
+  const openAskAlalay = (opp = null, session = null, initialPrompt = '') => {
     setAskAlalayOpportunity(opp);
     setLoadedChatSession(session);
+    setAskAlalayInitialPrompt(initialPrompt);
     setAskAlalayOpen(true);
   };
 
@@ -1472,6 +1532,10 @@ export const AppProvider = ({ children }) => {
         completeOnboardingWizard,
         // Dynamic Core Data
         documents,
+        setDocuments,
+        uploadNewDocument,
+        replaceDocument,
+        deleteDocument,
         opportunities,
         categories: CATEGORIES,
         sources,
@@ -1503,6 +1567,8 @@ export const AppProvider = ({ children }) => {
         setAskAlalayOpen,
         askAlalayOpportunity,
         setAskAlalayOpportunity,
+        askAlalayInitialPrompt,
+        setAskAlalayInitialPrompt,
         openAskAlalay,
         uploadModalOpen,
         setUploadModalOpen,

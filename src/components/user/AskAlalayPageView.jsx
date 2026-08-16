@@ -28,135 +28,21 @@ import {
 import { useApp } from '../../context/AppContext';
 import { askAlalayAI } from '../../services/geminiService';
 import { calculateCitizenAge } from '../../services/rulesEngine';
-import logoImg from '../../assets/logos.png';
+import logoImg from '../../assets/AIlogos.png';
+
+import { AiMessageRenderer } from '../common/AiMessageRenderer';
 
 /**
  * Rich Step-by-Step and Multi-Paragraph Formatter for Dedicated Page View
  */
 const FullPageMessageRenderer = ({ text, sourceUrl, matchedOpportunities = [] }) => {
-  const [copied, setCopied] = useState(false);
-
-  if (!text) return null;
-  const lines = text.split('\n');
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   return (
-    <div className="space-y-3 text-xs sm:text-sm leading-relaxed text-slate-800 relative group">
-      {/* Quick Copy Action */}
-      <button
-        type="button"
-        onClick={handleCopy}
-        className="absolute top-0 right-0 p-1.5 rounded-lg bg-slate-100/80 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all opacity-0 group-hover:opacity-100 cursor-pointer flex items-center gap-1 text-[11px] font-semibold z-10"
-        title="Copy response"
-      >
-        {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-        <span>{copied ? 'Copied' : 'Copy'}</span>
-      </button>
-
-      {lines.map((line, idx) => {
-        const raw = line.trim();
-        if (!raw) return null;
-
-        // Heading format
-        if (raw.startsWith('###') || raw.startsWith('##') || (raw.startsWith('**') && raw.endsWith(':**'))) {
-          return (
-            <div
-              key={idx}
-              className="text-sm sm:text-base font-extrabold text-[#093a96] pt-1.5 pb-1 border-b border-blue-100 flex items-center gap-2"
-            >
-              <Sparkles className="w-4 h-4 text-blue-600 flex-shrink-0" />
-              <span>{raw.replace(/^#+\s*/, '').replace(/\*\*/g, '')}</span>
-            </div>
-          );
-        }
-
-        // Numbered Steps (e.g. 1., 2., Step 1:)
-        const stepMatch = raw.match(/^(\d+)[\.\)]\s*(.*)/);
-        if (stepMatch) {
-          const stepNum = stepMatch[1];
-          const stepContent = stepMatch[2];
-          return (
-            <div
-              key={idx}
-              className="p-3 sm:p-3.5 rounded-2xl bg-white border border-blue-100/90 shadow-2xs flex items-start gap-3 my-1"
-            >
-              <div className="w-6 h-6 rounded-full bg-[#093a96] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5 shadow-2xs">
-                {stepNum}
-              </div>
-              <div className="text-xs sm:text-sm font-medium text-slate-700 leading-relaxed">
-                {stepContent}
-              </div>
-            </div>
-          );
-        }
-
-        // Bullet points
-        if (raw.startsWith('•') || raw.startsWith('-') || raw.startsWith('*')) {
-          return (
-            <div key={idx} className="flex items-start gap-2.5 pl-2 text-slate-700">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] mt-2 flex-shrink-0" />
-              <span className="font-normal">{raw.replace(/^[•\-\*]\s*/, '')}</span>
-            </div>
-          );
-        }
-
-        return (
-          <p key={idx} className="leading-relaxed">
-            {raw}
-          </p>
-        );
-      })}
-
-      {/* Matched Opportunity Cards Grounding */}
-      {matchedOpportunities && matchedOpportunities.length > 0 && (
-        <div className="pt-2.5 mt-2 border-t border-slate-200/80 space-y-1.5">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Building2 className="w-3.5 h-3.5 text-[#093a96]" />
-            <span>Matched Citizen Programs & Services:</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {matchedOpportunities.map((opp, oIdx) => (
-              <div
-                key={oIdx}
-                className="p-2.5 rounded-xl bg-blue-50/60 border border-blue-200/70 flex items-center justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-[#093a96] truncate">{opp.title}</div>
-                  <div className="text-[10px] text-slate-500 truncate">{opp.agency || 'Government Program'}</div>
-                </div>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex-shrink-0">
-                  {opp.matchScore || 95}% Match
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Verified Citation Footer */}
-      {sourceUrl && (
-        <div className="pt-2 mt-1.5 border-t border-blue-100 flex items-center justify-between text-xs text-slate-500 flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 font-bold text-emerald-700">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span>Grounded in Official Citizen's Charter</span>
-          </div>
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#093a96] font-bold hover:underline inline-flex items-center gap-1"
-          >
-            <span>{sourceUrl.replace(/^https?:\/\//, '').split('/')[0]}</span>
-            <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-          </a>
-        </div>
-      )}
-    </div>
+    <AiMessageRenderer
+      text={text}
+      sourceUrl={sourceUrl}
+      matchedOpportunities={matchedOpportunities}
+      size="md"
+    />
   );
 };
 
@@ -293,7 +179,6 @@ Ask me anything below or select a recommended topic from the sidebar.`,
         text: replyText,
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         sourceUrl: 'https://www.gov.ph',
-        matchedOpportunities: matched,
       };
 
       const finalMessages = [...updatedList, aiMsg];
@@ -503,8 +388,8 @@ ${messages
           {/* 1. Fixed Card Header (Always in view) */}
           <div className="p-3.5 sm:px-5 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between flex-shrink-0 z-10">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-full bg-[#093a96] text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                <Bot className="w-3.5 h-3.5" />
+              <div className="w-8 h-8 rounded-full bg-white border border-blue-200 p-0.5 flex items-center justify-center flex-shrink-0 shadow-xs">
+                <img src={logoImg} alt="ALALAY AI" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h3 className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-sm">
@@ -532,8 +417,8 @@ ${messages
                   className={`flex gap-3 ${isAi ? 'justify-start' : 'justify-end'}`}
                 >
                   {isAi && (
-                    <div className="w-7 h-7 rounded-full bg-[#093a96] text-white flex items-center justify-center flex-shrink-0 mt-1 shadow-xs">
-                      <Bot className="w-3.5 h-3.5" />
+                    <div className="w-7 h-7 rounded-full bg-white border border-blue-200 p-0.5 flex items-center justify-center flex-shrink-0 mt-1 shadow-2xs">
+                      <img src={logoImg} alt="ALALAY AI" className="w-full h-full object-contain" />
                     </div>
                   )}
 
@@ -574,8 +459,8 @@ ${messages
 
             {isTyping && (
               <div className="flex gap-2.5 justify-start items-center">
-                <div className="w-7 h-7 rounded-full bg-[#093a96] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
-                  <Bot className="w-3.5 h-3.5" />
+                <div className="w-7 h-7 rounded-full bg-white border border-blue-200 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                  <img src={logoImg} alt="ALALAY AI" className="w-full h-full object-contain animate-bounce" />
                 </div>
                 <div className="p-3.5 rounded-2xl bg-white border border-slate-200 text-slate-500 shadow-xs flex items-center gap-2 text-xs font-semibold">
                   <span className="w-2 h-2 rounded-full bg-[#093a96] animate-bounce" />

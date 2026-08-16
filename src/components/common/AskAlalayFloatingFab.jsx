@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import logoImg from '../../assets/logos.png';
+import logoImg from '../../assets/AIlogos.png';
 
 export const AskAlalayFloatingFab = () => {
   const { askAlalayOpen, setAskAlalayOpen, viewMode, isAuthenticated } = useApp();
@@ -14,7 +14,7 @@ export const AskAlalayFloatingFab = () => {
         type="button"
         onClick={() => setAskAlalayOpen(true)}
         aria-label="Open Ask ALALAY AI Assistant"
-        className="group relative w-14 h-14 rounded-full bg-[#093a96] hover:bg-[#072d75] p-2 flex items-center justify-center shadow-2xl shadow-blue-900/40 border-2 border-white cursor-pointer transition-all duration-300 hover:scale-110 active:scale-95"
+        className="group relative w-14 h-14 rounded-full bg-[#093a96] hover:bg-[#072d75] p-1 flex items-center justify-center shadow-2xl shadow-blue-900/40 border-2 border-white cursor-pointer transition-all duration-300 hover:scale-110 active:scale-95"
       >
         {/* Pulsing Online Green Beacon */}
         <span className="absolute top-0 right-0 flex h-3.5 w-3.5">
@@ -23,7 +23,7 @@ export const AskAlalayFloatingFab = () => {
         </span>
 
         {/* ALALAY Circular Logo Emblem */}
-        <div className="w-full h-full rounded-full bg-white p-1 flex items-center justify-center overflow-hidden shadow-sm group-hover:rotate-6 transition-transform duration-300">
+        <div className="w-full h-full rounded-full bg-white p-0.25 flex items-center justify-center overflow-hidden shadow-sm group-hover:rotate-6 transition-transform duration-300">
           <img
             src={logoImg}
             alt="ALALAY Logo"

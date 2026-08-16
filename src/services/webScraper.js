@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { generateContentHash, normalizeContent } from './facebookScraper';
+import { generateContentHash, normalizeContent } from './facebookScraper.js';
 
 /**
  * Official Philippine Government Agency Grounded Directory
@@ -178,6 +178,75 @@ export const OFFICIAL_AGENCY_DIRECTORY = {
     paragraphs: [
       'Under Republic Act 9994 and RA 10754, qualified Senior Citizens and Persons with Disabilities (PWDs) are entitled to a 20% statutory discount and full 12% Value-Added Tax (VAT) exemption on medicines, medical supplies, and basic food purchases.',
       'Minimum wage earners in the private and public sectors are 100% exempt from payment of income tax on their minimum wage compensation, statutory overtime, holiday, and night shift differential pay.',
+    ],
+  },
+  'ncsc.gov.ph': {
+    name: 'OSCA / NCSC - Office for Senior Citizens Affairs',
+    title: 'National Commission of Senior Citizens & OSCA Portal',
+    category: 'Social Services',
+    description:
+      'The Office for Senior Citizens Affairs (OSCA) in coordination with the National Commission of Senior Citizens (NCSC) is responsible for the issuance of OSCA Senior Citizen IDs, implementation of RA 9994 discounts, social pension administration, and elderly welfare programs across Philippine LGUs.',
+    headings: [
+      'OSCA Senior Citizen ID Issuance & Registration (RA 9994)',
+      'Mandatory 20% Discount and 12% VAT Exemption',
+      'DSWD Social Pension for Indigent Senior Citizens (₱1,000/month)',
+      'Automatic PhilHealth Lifetime Coverage (RA 10645)',
+      'Free Maintenance Medicines at Barangay Health Centers',
+    ],
+    paragraphs: [
+      'Filipino citizens aged 60 years old and above are entitled to an OSCA Senior Citizen ID issued free of charge at their City or Municipal OSCA Hall upon presentation of birth certificate and 1x1 photos.',
+      'Under Republic Act 9994, senior citizens enjoy a 20% statutory discount and 12% VAT exemption on prescription medicines, diagnostic laboratory fees, transport fares, hotels, and restaurant dining.',
+    ],
+  },
+  'dilg.gov.ph': {
+    name: 'DILG - Department of the Interior and Local Government',
+    title: 'Department of the Interior and Local Government | Barangay Affairs Portal',
+    category: 'Civic & Local Government',
+    description:
+      'The Department of the Interior and Local Government oversees local government units (LGUs) and Barangay affairs across the Philippines, regulating the issuance of Barangay Certificates, Barangay Clearances, Certificates of Indigency, and Certificates of Residency.',
+    headings: [
+      'Barangay Certificate of Residency & Indigency Issuance',
+      'Barangay Clearance & Business Permit Processing',
+      'Republic Act 11261 (First-Time Jobseekers Free Document Act)',
+      'Lupong Tagapamayapa & Katarungang Pambarangay Conciliation',
+      'Barangay Health & Emergency Response Services',
+    ],
+    paragraphs: [
+      'Barangay Certificates and Indigency Certifications are officially issued by the Barangay Secretary and Punong Barangay at your local Barangay Hall with same-day 15-30 minute processing.',
+      'Under Republic Act No. 11261 (First Time Jobseekers Assistance Act), Barangay Clearances, Certificates of Residency, and Indigency Certifications are 100% Free of charge for all first-time jobseekers.',
+    ],
+  },
+  'psa.gov.ph': {
+    name: 'PSA - Philippine Statistics Authority',
+    title: 'Philippine Statistics Authority | Civil Registration & PhilSys Portal',
+    category: 'Civil Registry & Identity',
+    description:
+      'The Philippine Statistics Authority is the primary statistical and civil registration agency of the Philippine government, administering the PhilSys National ID (ePhilID) and issuing official civil registry documents including PSA Birth, Marriage, and Death Certificates.',
+    headings: [
+      'PhilSys National ID Registration & ePhilID Issuance',
+      'PSA Birth, Marriage, and Death Certificate Requests',
+      'Republic Act 11909 (Permanent Validity of Birth Certificates Act)',
+      'Certificate of No Marriage Record (CENOMAR)',
+    ],
+    paragraphs: [
+      'PhilSys National ID registration is 100% free at PSA registration centers, providing permanent lifetime identity verification for all Filipino citizens.',
+      'Under RA 11909, PSA-issued Birth Certificates have permanent validity and do not expire regardless of issuance date.',
+    ],
+  },
+  'clearance.nbi.gov.ph': {
+    name: 'NBI - National Bureau of Investigation',
+    title: 'National Bureau of Investigation | Clearance Portal',
+    category: 'Clearances & Law Enforcement',
+    description:
+      'The National Bureau of Investigation issues official NBI Clearances for employment, local and international travel, licensing, and legal identification across the Philippines.',
+    headings: [
+      'NBI Online Clearance Application & Renewal',
+      'NBI Quick Renewal Door-to-Door Delivery Service',
+      'First-Time Jobseekers Free Clearance Benefit (RA 11261)',
+    ],
+    paragraphs: [
+      'NBI Clearances are valid for one (1) year (365 days) from the date of issuance.',
+      'Applications can be filed online via clearance.nbi.gov.ph with biometric capture and same-day release at designated NBI clearance centers nationwide.',
     ],
   },
 };
