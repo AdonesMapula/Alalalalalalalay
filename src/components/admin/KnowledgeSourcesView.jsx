@@ -13,9 +13,11 @@ import {
   Trash2,
   Globe,
   Sparkles,
+  Eye,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AddSourceModal } from './AddSourceModal';
+import { SourceDetailsModal } from './SourceDetailsModal';
 
 export const KnowledgeSourcesView = () => {
   const {
@@ -31,6 +33,7 @@ export const KnowledgeSourcesView = () => {
   const [selectedFilter, setSelectedFilter] = useState('All Sources');
   const [filterText, setFilterText] = useState('');
   const [scrapingId, setScrapingId] = useState(null);
+  const [selectedDetailSource, setSelectedDetailSource] = useState(null);
 
   // Quick inline URL input state
   const [quickUrl, setQuickUrl] = useState('');
@@ -393,7 +396,16 @@ export const KnowledgeSourcesView = () => {
 
                       {/* Action Buttons */}
                       <td className="py-4 px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            title="View Scraped Details & Services"
+                            onClick={() => setSelectedDetailSource(row)}
+                            className="p-2 rounded-xl text-slate-500 hover:text-[#093a96] hover:bg-blue-50 transition-colors cursor-pointer"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
                           <button
                             type="button"
                             title="Scrape URL Live"
@@ -401,7 +413,7 @@ export const KnowledgeSourcesView = () => {
                             onClick={() => handleRowScrape(row.id)}
                             className="p-2 rounded-xl text-slate-500 hover:text-[#093a96] hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50"
                           >
-                            <RefreshCw className={`w-3.5 h-3.5 ${isThisScraping ? 'animate-spin text-[#093a96]' : ''}`} />
+                            <RefreshCw className={`w-4 h-4 ${isThisScraping ? 'animate-spin text-[#093a96]' : ''}`} />
                           </button>
 
                           <button
@@ -410,7 +422,7 @@ export const KnowledgeSourcesView = () => {
                             onClick={() => removeKnowledgeSource(row.id)}
                             className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -446,6 +458,12 @@ export const KnowledgeSourcesView = () => {
       </div>
 
       <AddSourceModal />
+      <SourceDetailsModal
+        source={selectedDetailSource}
+        onClose={() => setSelectedDetailSource(null)}
+        onRescrape={(id) => handleRowScrape(id)}
+        isScraping={scrapingId === selectedDetailSource?.id}
+      />
     </div>
   );
 };

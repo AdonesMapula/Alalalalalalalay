@@ -18,6 +18,7 @@ import { NotificationsView } from './components/user/NotificationsView';
 import { UserProfileView } from './components/user/UserProfileView';
 import { OpportunityDetailModal } from './components/user/OpportunityDetailModal';
 import { AskAlalayChatModal } from './components/user/AskAlalayChatModal';
+import { AskAlalayFloatingFab } from './components/common/AskAlalayFloatingFab';
 import { DocumentUploadModal } from './components/user/DocumentUploadModal';
 
 // Admin Views
@@ -146,6 +147,7 @@ const MainAppContent = () => {
       {/* Floating Modals & Overlays */}
       <OpportunityDetailModal />
       <AskAlalayChatModal />
+      <AskAlalayFloatingFab />
       <DocumentUploadModal />
       <WelcomeModal />
       <GuidedTour />

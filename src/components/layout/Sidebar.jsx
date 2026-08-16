@@ -5,13 +5,12 @@ import {
   FileText,
   User,
   Settings,
-  HelpCircle,
-  Bot,
   Shield,
   Activity,
   Building2,
   ListChecks,
   FileSpreadsheet,
+  LogOut,
 } from 'lucide-react';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { useApp } from '../../context/AppContext';
@@ -23,7 +22,6 @@ export const Sidebar = () => {
     setActiveTab,
     adminTab,
     setAdminTab,
-    openAskAlalay,
     reviewQueue,
     logout,
   } = useApp();
@@ -44,13 +42,13 @@ export const Sidebar = () => {
   ];
 
   return (
-    <aside className="hidden md:flex flex-col w-60 p-6 bg-white border-r border-slate-200/80 min-h-screen select-none justify-between">
-      {/* Top Branding matching Image 3 */}
+    <aside className="hidden md:flex flex-col w-64 h-screen sticky top-0 p-6 bg-white border-r border-slate-200/80 select-none justify-between z-20">
+      {/* Top Branding & Navigation */}
       <div className="space-y-8">
         <AlalayLogo size="sm" showSubtitle />
 
         {/* Navigation items */}
-        <nav className="space-y-2">
+        <nav className="space-y-1.5">
           {viewMode === 'user' ? (
             citizenNav.map((item) => {
               const isActive = activeTab === item.id;
@@ -61,9 +59,9 @@ export const Sidebar = () => {
                   key={item.id}
                   type="button"
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-[#093a96] text-white shadow-sm shadow-blue-900/20'
+                      ? 'bg-[#093a96] text-white shadow-md shadow-blue-900/20 font-bold'
                       : 'text-slate-600 hover:text-[#093a96] hover:bg-slate-50'
                   }`}
                 >
@@ -82,9 +80,9 @@ export const Sidebar = () => {
                   key={item.id}
                   type="button"
                   onClick={() => setAdminTab(item.id)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? 'bg-slate-900 text-white shadow-sm'
+                      ? 'bg-slate-900 text-white shadow-sm font-bold'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                   }`}
                 >
@@ -104,38 +102,25 @@ export const Sidebar = () => {
         </nav>
       </div>
 
-      {/* Bottom Sidebar Controls & Ask ALALAY button (Image 3 & 5) */}
-      <div className="space-y-3 pt-6 border-t border-slate-100">
-        <div className="flex items-center justify-between px-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('profile')}
-            className="flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
-          >
-            <Settings className="w-3.5 h-3.5 text-slate-400" />
-            <span>Settings</span>
-          </button>
+      {/* Bottom Sidebar Controls */}
+      <div className="space-y-2 pt-6 border-t border-slate-100">
+        <button
+          type="button"
+          onClick={() => setActiveTab('profile')}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
+        >
+          <Settings className="w-4 h-4 text-slate-400" />
+          <span>Settings</span>
+        </button>
 
-          <button
-            type="button"
-            onClick={logout}
-            className="text-xs font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
-          >
-            Log Out
-          </button>
-        </div>
-
-        {/* Big Bottom "Ask ALALAY" Button */}
-        {viewMode === 'user' && (
-          <button
-            type="button"
-            onClick={() => openAskAlalay()}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-[#093a96] hover:bg-[#072d75] text-white text-xs font-bold shadow-md shadow-blue-900/15 cursor-pointer transition-all active:scale-[0.98]"
-          >
-            <Bot className="w-4 h-4" />
-            <span>Ask ALALAY</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+        >
+          <LogOut className="w-4 h-4 text-rose-500" />
+          <span>Log Out</span>
+        </button>
       </div>
     </aside>
   );

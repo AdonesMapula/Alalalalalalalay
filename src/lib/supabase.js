@@ -249,19 +249,100 @@ export const fetchOpportunities = async () => {
       .from('opportunities')
       .select('*')
       .order('created_at', { ascending: false });
-    return { data, error };
+
+    if (data && data.length > 0) {
+      const formatted = data.map((o) => ({
+        id: o.id,
+        title: o.title,
+        agency: o.agency,
+        category: o.category,
+        categoryName: o.category_name || o.categoryName || 'General',
+        categoryColor: o.category_color || o.categoryColor || '#093a96',
+        shortDesc: o.short_desc || o.shortDesc || '',
+        fullDesc: o.full_desc || o.fullDesc || '',
+        matchScore: o.match_score || o.matchScore || 88,
+        matchStatus: o.match_status || o.matchStatus || 'Likely Eligible',
+        confidence: o.confidence || '96% Confident',
+        deadline: o.deadline || 'Open Year-Round',
+        isApproved: o.is_approved ?? true,
+        benefits: o.benefits || [],
+        whyYouQualify: o.why_you_qualify || o.whyYouQualify || [],
+        requirements: o.requirements || [],
+        missingItems: o.missing_items || o.missingItems || [],
+        officialSource: o.official_source || o.officialSource || {},
+        createdAt: o.created_at,
+      }));
+      return { data: formatted, error: null };
+    }
+
+    return { data: [], error };
   } catch (err) {
     return { data: null, error: err.message };
   }
 };
 
 export const createOpportunity = async (oppData) => {
-  if (!isSupabaseConfigured) return { data: null, error: 'Not configured' };
+  if (!isSupabaseConfigured || !oppData) return { data: null, error: 'Not configured' };
   try {
+    const payload = {
+      title: oppData.title,
+      agency: oppData.agency || 'Government Agency',
+      category: (oppData.category || 'health').toLowerCase(),
+      category_name: oppData.categoryName || oppData.category || 'General',
+      category_color: oppData.categoryColor || '#093a96',
+      short_desc: oppData.shortDesc || oppData.fullDesc || 'Government assistance program.',
+      full_desc: oppData.fullDesc || oppData.shortDesc || '',
+      match_score: oppData.matchScore || 90,
+      match_status: oppData.matchStatus || 'Likely Eligible',
+      confidence: oppData.confidence || '96% Confident',
+      deadline: oppData.deadline || 'Ongoing Program',
+      is_approved: oppData.isApproved ?? true,
+      benefits: oppData.benefits || [],
+      why_you_qualify: oppData.whyYouQualify || [],
+      requirements: oppData.requirements || [],
+      missing_items: oppData.missingItems || [],
+      official_source: oppData.officialSource || {},
+    };
+
     const { data, error } = await supabase
       .from('opportunities')
-      .insert([oppData])
+      .insert([payload])
       .select();
+
+    return { data, error };
+  } catch (err) {
+    return { data: null, error: err.message };
+  }
+};
+
+export const saveMultipleOpportunitiesToSupabase = async (oppsList = []) => {
+  if (!isSupabaseConfigured || !oppsList || oppsList.length === 0) return { data: null };
+  try {
+    const payloads = oppsList.map((oppData) => ({
+      title: oppData.title,
+      agency: oppData.agency || 'Government Agency',
+      category: (oppData.category || 'health').toLowerCase(),
+      category_name: oppData.categoryName || oppData.category || 'General',
+      category_color: oppData.categoryColor || '#093a96',
+      short_desc: oppData.shortDesc || oppData.fullDesc || 'Government assistance program.',
+      full_desc: oppData.fullDesc || oppData.shortDesc || '',
+      match_score: oppData.matchScore || 90,
+      match_status: oppData.matchStatus || 'Likely Eligible',
+      confidence: oppData.confidence || '96% Confident',
+      deadline: oppData.deadline || 'Ongoing Program',
+      is_approved: oppData.isApproved ?? true,
+      benefits: oppData.benefits || [],
+      why_you_qualify: oppData.whyYouQualify || [],
+      requirements: oppData.requirements || [],
+      missing_items: oppData.missingItems || [],
+      official_source: oppData.officialSource || {},
+    }));
+
+    const { data, error } = await supabase
+      .from('opportunities')
+      .insert(payloads)
+      .select();
+
     return { data, error };
   } catch (err) {
     return { data: null, error: err.message };

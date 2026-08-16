@@ -43,6 +43,131 @@ export const CATEGORIES = [
 
 export const OPPORTUNITIES = [
   {
+    id: 'opp_sss_salary_loan',
+    title: 'SSS Salary & Calamity Loan Assistance',
+    agency: 'Social Security System (SSS)',
+    category: 'finance',
+    categoryName: 'Finance & Loans',
+    categoryColor: '#093a96',
+    shortDesc: 'Low-interest short-term cash loan up to 2 months average salary with 10% annual interest rate and 24-month repayment terms.',
+    fullDesc: 'The SSS Member Loan Program allows active contributing members (employed, self-employed, voluntary, and OFW) to borrow cash to meet short-term financial needs. Qualified members can borrow up to one or two months of their average monthly salary credit.',
+    matchScore: 95,
+    matchStatus: 'Likely Eligible',
+    confidence: '99% Confident',
+    deadline: 'Open Year-Round Online',
+    isApproved: true,
+    benefits: [
+      'Cash loan proceeds up to 2 months average salary credit',
+      'Low 10% annual interest rate computed on diminishing balance',
+      'Flexible 24-month installment schedule via payroll or online auto-debit',
+      'Instant electronic disbursement via My.SSS and UMID-ATM / Bank Card',
+      'Zero application fees or third-party processing charges'
+    ],
+    whyYouQualify: [
+      { text: 'Active SSS member with at least 36 posted monthly contributions', status: 'met' },
+      { text: 'PhilSys National ID or UMID verified', status: 'met' },
+      { text: 'No existing defaulted or fraudulent SSS claim', status: 'met' }
+    ],
+    requirements: [
+      { name: 'Valid Government Issued Photo ID (UMID / PhilSys ID)', status: 'met', sourceRef: 'SSS Loan Policy Circular' },
+      { name: 'Active My.SSS Online Portal Account', status: 'met', sourceRef: 'My.SSS Member Portal' },
+      { name: 'Disbursement Bank Account / UMID-ATM details', status: 'action_required', sourceRef: 'SSS Online Disbursement System' }
+    ],
+    missingItems: [],
+    officialSource: {
+      agency: 'Social Security System (SSS)',
+      url: 'https://www.sss.gov.ph',
+      pageTitle: 'SSS Member Loans Guidelines and Application',
+      lastScrapedAt: '2026-08-15T08:00:00Z',
+      lastVerifiedAt: '2026-08-15T12:00:00Z',
+      sourceHash: 'sha256-sss-salary-loan',
+      scraperConfidence: '99.5%'
+    }
+  },
+  {
+    id: 'opp_pagibig_mpl',
+    title: 'Pag-IBIG Multi-Purpose Cash Loan (HDMF MPL)',
+    agency: 'Pag-IBIG Fund (HDMF)',
+    category: 'finance',
+    categoryName: 'Finance & Loans',
+    categoryColor: '#34C759',
+    shortDesc: 'Borrow up to 80% of total accumulated Pag-IBIG savings for emergency financial needs, tuition, or medical expenses at 10.5% p.a.',
+    fullDesc: 'The Pag-IBIG Multi-Purpose Loan (MPL) is a cash loan facility designed to help members with financial needs. Members can borrow up to 80% of their Pag-IBIG Regular Savings (Total Accumulated Value) with a low annual interest rate of 10.5%.',
+    matchScore: 94,
+    matchStatus: 'Likely Eligible',
+    confidence: '98% Confident',
+    deadline: 'Open Year-Round (Virtual Pag-IBIG)',
+    isApproved: true,
+    benefits: [
+      'Borrow up to 80% of Total Accumulated Value (TAV) Pag-IBIG savings',
+      'Affordable 10.5% annual interest rate',
+      'Flexible 24 or 36 month repayment period',
+      'Fast electronic release to Pag-IBIG Loyalty Card Plus or cash card',
+      'Deferred payment grace period available'
+    ],
+    whyYouQualify: [
+      { text: 'At least 24 monthly Pag-IBIG membership savings contributions', status: 'met' },
+      { text: 'Proof of income / employment valid in profile', status: 'met' },
+      { text: 'National ID verified', status: 'met' }
+    ],
+    requirements: [
+      { name: 'Pag-IBIG Member ID (MID) Number', status: 'met', sourceRef: 'HDMF Circular 407' },
+      { name: 'Valid Government Issued Photo ID', status: 'met', sourceRef: 'Virtual Pag-IBIG' },
+      { name: 'Proof of Income / Latest Payslip / Certificate of Employment', status: 'met', sourceRef: 'Credit Matrix' }
+    ],
+    missingItems: [],
+    officialSource: {
+      agency: 'Pag-IBIG Fund (HDMF)',
+      url: 'https://www.pagibigfund.gov.ph',
+      pageTitle: 'Pag-IBIG Multi-Purpose Loan (MPL) Guidelines',
+      lastScrapedAt: '2026-08-15T08:00:00Z',
+      lastVerifiedAt: '2026-08-15T12:00:00Z',
+      sourceHash: 'sha256-pagibig-mpl',
+      scraperConfidence: '99.6%'
+    }
+  },
+  {
+    id: 'opp_dswd_aics',
+    title: 'DSWD AICS Emergency Crisis & Financial Cash Assistance',
+    agency: 'Department of Social Welfare and Development (DSWD)',
+    category: 'social',
+    categoryName: 'Social & Emergency Aid',
+    categoryColor: '#FF9500',
+    shortDesc: 'Immediate non-repayable direct cash assistance (₱3,000 to ₱10,000) and guarantee letters for families and individuals in crisis.',
+    fullDesc: 'Assistance to Individuals in Crisis Situation (AICS) serves as a social safety net to support the recovery of poor, vulnerable, and disadvantaged individuals and families facing unexpected crises (medical, funeral, educational, food, and transport needs).',
+    matchScore: 96,
+    matchStatus: 'Likely Eligible',
+    confidence: '99% Confident',
+    deadline: 'Immediate On-Site Assistance',
+    isApproved: true,
+    benefits: [
+      '₱3,000 to ₱10,000 direct non-repayable emergency cash assistance grant',
+      'Medical Guarantee Letters (GL) covering prescription medicines and laboratory tests',
+      'Emergency transportation, funeral, and food assistance grants',
+      'Direct social work assessment and expedited one-stop release'
+    ],
+    whyYouQualify: [
+      { text: 'Resident experiencing emergency or unexpected financial crisis', status: 'met' },
+      { text: 'Barangay Indigency / Certificate of Eligibility verified', status: 'met' },
+      { text: 'Filipino citizen resident verification confirmed', status: 'met' }
+    ],
+    requirements: [
+      { name: 'Barangay Certificate of Indigency / Proof of Residence', status: 'met', sourceRef: 'DSWD Memorandum Circular 15' },
+      { name: 'Valid Government Issued Photo ID', status: 'met', sourceRef: 'DSWD Field Office Standards' },
+      { name: 'Clinical Abstract / Hospital Statement of Account (for medical grant)', status: 'action_required', sourceRef: 'Social Service Assessment Unit' }
+    ],
+    missingItems: [],
+    officialSource: {
+      agency: 'Department of Social Welfare and Development (DSWD)',
+      url: 'https://www.dswd.gov.ph',
+      pageTitle: 'DSWD Assistance to Individuals in Crisis Situation (AICS)',
+      lastScrapedAt: '2026-08-15T08:00:00Z',
+      lastVerifiedAt: '2026-08-15T12:00:00Z',
+      sourceHash: 'sha256-dswd-aics',
+      scraperConfidence: '99.4%'
+    }
+  },
+  {
     id: 'opp_philhealth_senior',
     title: 'PhilHealth Senior Citizen & Dependent Lifetime Benefits',
     agency: 'PhilHealth',
