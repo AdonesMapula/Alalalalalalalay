@@ -15,6 +15,7 @@ import {
   HeartHandshake,
   Download,
   AlertTriangle,
+  Zap,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSCard } from '../common/IOSCard';
@@ -26,6 +27,7 @@ export const UserProfileView = () => {
   const {
     user,
     setUser,
+    categories,
     startOnboardingWizard,
     startGuidedTour,
     addToast,
@@ -34,6 +36,42 @@ export const UserProfileView = () => {
   const [aiNotifications, setAiNotifications] = useState(true);
   const [docAlerts, setDocAlerts] = useState(true);
   const [shareDataForMatching, setShareDataForMatching] = useState(true);
+
+  const autoApplyCategoryOptions = categories.filter((c) => c.id !== 'all' && c.id !== 'employment');
+  const defaultAutoApplyCategories = autoApplyCategoryOptions.map((c) => c.id);
+  const selectedAutoApplyCategories = user.autoApplyCategories || defaultAutoApplyCategories;
+
+  const handleToggleAutoApply = (enabled) => {
+    setUser((prev) => ({
+      ...prev,
+      autoApplyEnabled: enabled,
+      autoApplyCategories:
+        prev.autoApplyCategories && prev.autoApplyCategories.length > 0
+          ? prev.autoApplyCategories
+          : defaultAutoApplyCategories,
+    }));
+    addToast(
+      enabled ? 'Auto-Apply Enabled' : 'Auto-Apply Disabled',
+      enabled
+        ? "ALALAY will queue services you're a 100% match for — you'll still tap Submit yourself."
+        : 'ALALAY will no longer auto-queue applications for you.',
+      'info'
+    );
+  };
+
+  const toggleAutoApplyCategory = (categoryId) => {
+    setUser((prev) => {
+      const current = prev.autoApplyCategories || defaultAutoApplyCategories;
+      const updated = current.includes(categoryId)
+        ? current.filter((id) => id !== categoryId)
+        : [...current, categoryId];
+      return { ...prev, autoApplyCategories: updated };
+    });
+  };
+
+  const handleToggleAutoApplyJobs = (enabled) => {
+    setUser((prev) => ({ ...prev, autoApplyIncludeJobs: enabled }));
+  };
 
   const handleExportData = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(user, null, 2));
@@ -138,6 +176,70 @@ export const UserProfileView = () => {
             <span className="font-bold text-slate-800">{user.civilStatus}</span>
           </div>
         </div>
+      </IOSCard>
+
+      {/* Auto-Apply Assistant */}
+      <IOSCard className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Zap className="w-5 h-5 text-[#FF9500]" />
+          <h2 className="text-base font-bold text-[#1C1C1E]">
+            Auto-Apply Assistant
+          </h2>
+        </div>
+
+        <div className="flex items-center justify-between pt-1">
+          <div className="pr-4">
+            <h4 className="text-xs sm:text-sm font-bold text-[#1C1C1E]">
+              Enable Auto-Apply
+            </h4>
+            <p className="text-[11px] text-[#8E8E93]">
+              When ALALAY finds a service you're a 100% match for, it prepares your application and queues it for review — you always tap Submit yourself.
+            </p>
+          </div>
+          <IOSSwitch checked={Boolean(user.autoApplyEnabled)} onChange={handleToggleAutoApply} />
+        </div>
+
+        {user.autoApplyEnabled && (
+          <div className="pt-3 border-t border-slate-100 space-y-4">
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-[#1C1C1E]">Auto-Apply Categories</h4>
+              <p className="text-[11px] text-[#8E8E93]">
+                Only benefits in these categories will be auto-queued.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {autoApplyCategoryOptions.map((cat) => {
+                  const isSelected = selectedAutoApplyCategories.includes(cat.id);
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => toggleAutoApplyCategory(cat.id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#007AFF] text-white border-[#007AFF]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <div className="pr-4">
+                <h4 className="text-xs sm:text-sm font-bold text-[#1C1C1E]">
+                  Include Jobs & Employment Postings
+                </h4>
+                <p className="text-[11px] text-[#8E8E93]">
+                  Stricter bar: only auto-queues a job when all required documents are uploaded and it's a 100% match.
+                </p>
+              </div>
+              <IOSSwitch checked={Boolean(user.autoApplyIncludeJobs)} onChange={handleToggleAutoApplyJobs} />
+            </div>
+          </div>
+        )}
       </IOSCard>
 
       {/* Privacy, Consent & Notifications */}

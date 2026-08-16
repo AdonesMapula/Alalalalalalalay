@@ -24,6 +24,8 @@ import {
   Users,
   Award,
   MessageSquare,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { askAlalayAI } from '../../services/geminiService';
@@ -35,12 +37,13 @@ import { AiMessageRenderer } from '../common/AiMessageRenderer';
 /**
  * Rich Step-by-Step and Multi-Paragraph Formatter for Dedicated Page View
  */
-const FullPageMessageRenderer = ({ text, sourceUrl, matchedOpportunities = [] }) => {
+const FullPageMessageRenderer = ({ text, sourceUrl, matchedOpportunities = [], onUploadDocument }) => {
   return (
     <AiMessageRenderer
       text={text}
       sourceUrl={sourceUrl}
       matchedOpportunities={matchedOpportunities}
+      onUploadDocument={onUploadDocument}
       size="md"
     />
   );
@@ -57,6 +60,7 @@ export const AskAlalayPageView = () => {
     loadedChatSession,
     setLoadedChatSession,
     addToast,
+    openUploadForRequirement,
   } = useApp();
 
   const userAge = calculateCitizenAge(user);
@@ -210,12 +214,38 @@ Ask me anything below or select a recommended topic from the sidebar.`,
       const errMsg = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
-        text: 'ALALAY is currently referencing official Citizen Charters. Please check with your nearest Malasakit Center desk or government agency portal.',
+        text: 'ALALAY is currently checking official guidelines. Please check with your nearest Malasakit Center desk or government agency portal.',
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, errMsg]);
     } finally {
       setIsTyping(false);
+    }
+  };
+
+  const handleResponseFeedback = (messageId, value) => {
+    const updatedMessages = messages.map((message) => {
+      if (message.id !== messageId) return message;
+      return { ...message, feedback: message.feedback === value ? null : value };
+    });
+
+    setMessages(updatedMessages);
+
+    // Keep feedback in the saved chat when this conversation already exists.
+    if (
+      saveChatArchive &&
+      currentSessionId &&
+      updatedMessages.some((message) => message.sender === 'user')
+    ) {
+      const latestAiMessage = [...updatedMessages].reverse().find((message) => message.sender === 'ai');
+      saveChatArchive({
+        id: currentSessionId,
+        title: loadedChatSession?.title || `Inquiry: ${latestAiMessage?.text?.slice(0, 45) || 'Consultation'}...`,
+        preview: latestAiMessage?.text?.replace(/[#*•]/g, '').slice(0, 140) || '',
+        messageCount: updatedMessages.length,
+        sourceUrl: latestAiMessage?.sourceUrl || 'https://www.gov.ph',
+        messages: updatedMessages,
+      });
     }
   };
 
@@ -279,7 +309,7 @@ ${messages
               )}
             </div>
             <p className="text-[11px] text-blue-200 truncate font-medium">
-              Grounded in official Philippine Citizen's Charters, Malasakit Center guidelines, and statutory circulars.
+              Based on official Philippine government guidelines, Malasakit Center rules, and statutory circulars.
             </p>
           </div>
         </div>
@@ -397,7 +427,7 @@ ${messages
                 </h3>
                 <p className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Grounded in Verified Citizen Charters</span>
+                  <span>Based on Verified Government Guidelines</span>
                 </p>
               </div>
             </div>
@@ -430,11 +460,49 @@ ${messages
                     }`}
                   >
                     {isAi ? (
-                      <FullPageMessageRenderer
-                        text={msg.text}
-                        sourceUrl={msg.sourceUrl}
-                        matchedOpportunities={msg.matchedOpportunities}
-                      />
+                      <>
+                        <FullPageMessageRenderer
+                          text={msg.text}
+                          sourceUrl={msg.sourceUrl}
+                          matchedOpportunities={msg.matchedOpportunities}
+                          onUploadDocument={openUploadForRequirement}
+                        />
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-3">
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {msg.feedback ? 'Thanks for the feedback.' : 'Was this helpful?'}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleResponseFeedback(msg.id, 'good')}
+                              aria-label="Good response"
+                              aria-pressed={msg.feedback === 'good'}
+                              title="Good response"
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                msg.feedback === 'good'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                              }`}
+                            >
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleResponseFeedback(msg.id, 'bad')}
+                              aria-label="Not a helpful response"
+                              aria-pressed={msg.feedback === 'bad'}
+                              title="Not a helpful response"
+                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                                msg.feedback === 'bad'
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
+                              }`}
+                            >
+                              <ThumbsDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     ) : (
                       <p className="text-xs sm:text-sm leading-relaxed">{msg.text}</p>
                     )}
@@ -467,7 +535,7 @@ ${messages
                   <span className="w-2 h-2 rounded-full bg-[#093a96] animate-bounce [animation-delay:0.2s]" />
                   <span className="w-2 h-2 rounded-full bg-[#093a96] animate-bounce [animation-delay:0.4s]" />
                   <span className="text-xs text-slate-500 ml-1">
-                    Calculating procedural steps & Citizen's Charter...
+                    Checking application steps & official guidelines...
                   </span>
                 </div>
               </div>

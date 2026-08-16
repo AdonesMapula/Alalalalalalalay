@@ -29,6 +29,7 @@ import {
 } from '../lib/supabase';
 import { runFacebookSyncPipeline } from '../services/facebookScraper';
 import { scrapeAnyWebsite } from '../services/webScraper';
+import { rankAndFilterOpportunities, getAutoApplyMatches } from '../services/rulesEngine';
 import {
   INITIAL_USER,
   INITIAL_DOCUMENTS,
@@ -42,6 +43,22 @@ import {
 } from '../lib/mockData';
 
 const AppContext = createContext();
+
+// Maps a requirement name (e.g. "PhilHealth Member Registration Form (PMRF)") to the
+// closest matching category in the Document Vault upload form's dropdown.
+function guessDocumentTypeFromRequirement(requirementName = '') {
+  const q = requirementName.toLowerCase();
+  if (/philsys|national id|umid|valid id|government id|photo id/.test(q)) return 'National ID / Gov ID';
+  if (/barangay|indigency|residency|clearance of residence/.test(q)) return 'Barangay Certificate';
+  if (/philhealth|pmrf|mdr/.test(q)) return 'PhilHealth MDR';
+  if (/nbi/.test(q)) return 'NBI Clearance';
+  if (/police clearance/.test(q)) return 'Police Clearance';
+  if (/birth certificate|psa birth|psa marriage/.test(q)) return 'Birth Certificate (PSA)';
+  if (/clinical abstract|medical certificate|statement of account|hospital bill|prescription/.test(q)) return 'Medical Certificate / Clinical Abstract';
+  if (/certificate of employment|coe/.test(q)) return 'Certificate of Employment (COE)';
+  if (/registration|matriculation|enrollment|transcript|cor/.test(q)) return 'School Registration / Transcript';
+  return 'National ID / Gov ID';
+}
 
 export const AppProvider = ({ children }) => {
   // Navigation & View Mode
@@ -87,6 +104,33 @@ export const AppProvider = ({ children }) => {
     }
   });
 
+  // Pinned opportunity IDs, persisted so citizens can bookmark a service to revisit
+  // later (e.g. when they don't have the required document on hand yet), even after
+  // a page refresh.
+  const [pinnedOpportunityIds, setPinnedOpportunityIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alalay_pinned_opportunities');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const togglePinOpportunity = (oppId) => {
+    if (!oppId) return;
+    setPinnedOpportunityIds((prev) => {
+      const isPinned = prev.includes(oppId);
+      const updated = isPinned ? prev.filter((id) => id !== oppId) : [oppId, ...prev];
+      localStorage.setItem('alalay_pinned_opportunities', JSON.stringify(updated));
+      addToast(
+        isPinned ? 'Unpinned' : 'Pinned for Later',
+        isPinned ? 'Removed from your pinned services.' : 'Saved to your pinned services for quick access.',
+        'info'
+      );
+      return updated;
+    });
+  };
+
   // Keep Session and User Persistent in LocalStorage
   useEffect(() => {
     localStorage.setItem('alalay_auth', isAuthenticated ? 'true' : 'false');
@@ -110,6 +154,68 @@ export const AppProvider = ({ children }) => {
     const saved = localStorage.getItem('alalay_opportunities');
     return saved ? JSON.parse(saved) : OPPORTUNITIES;
   });
+
+  // Auto-Apply queue: opportunities the AI has detected as a 100% match under the
+  // citizen's Auto-Apply settings, staged as "Ready to Submit" until the citizen taps
+  // Submit — auto-apply prepares everything but never submits government paperwork on its own.
+  const [autoApplyQueue, setAutoApplyQueue] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alalay_auto_apply_queue');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('alalay_auto_apply_queue', JSON.stringify(autoApplyQueue));
+  }, [autoApplyQueue]);
+
+  // Continuously scan for new 100%-match opportunities whenever documents, the
+  // opportunity catalog, or the citizen's Auto-Apply settings change.
+  useEffect(() => {
+    if (!user?.autoApplyEnabled) return;
+
+    const ranked = rankAndFilterOpportunities(opportunities, user, documents);
+    const eligible = getAutoApplyMatches(ranked, user);
+
+    setAutoApplyQueue((prev) => {
+      const queuedIds = new Set(prev.map((entry) => entry.oppId));
+      const newlyEligible = eligible.filter((opp) => !queuedIds.has(opp.id));
+
+      if (newlyEligible.length === 0) return prev;
+
+      newlyEligible.forEach((opp) => {
+        addToast(
+          '🎯 100% Match Found',
+          `${opp.title} is fully ready — review and submit it from your Auto-Apply queue.`,
+          'success'
+        );
+      });
+
+      const newEntries = newlyEligible.map((opp) => ({
+        oppId: opp.id,
+        status: 'ready_to_submit',
+        queuedAt: new Date().toISOString(),
+      }));
+
+      return [...newEntries, ...prev];
+    });
+  }, [user?.autoApplyEnabled, user?.autoApplyCategories, user?.autoApplyIncludeJobs, opportunities, documents]);
+
+  const submitAutoApply = (oppId) => {
+    const opp = opportunities.find((o) => o.id === oppId);
+    setAutoApplyQueue((prev) =>
+      prev.map((entry) =>
+        entry.oppId === oppId ? { ...entry, status: 'applied', appliedAt: new Date().toISOString() } : entry
+      )
+    );
+    addToast('Application Submitted', `${opp?.title || 'Your application'} has been submitted.`, 'success');
+  };
+
+  const dismissAutoApply = (oppId) => {
+    setAutoApplyQueue((prev) => prev.filter((entry) => entry.oppId !== oppId));
+  };
 
   const [sources, setSources] = useState(() => {
     const saved = localStorage.getItem('alalay_sources');
@@ -193,6 +299,7 @@ export const AppProvider = ({ children }) => {
   const [askAlalayOpen, setAskAlalayOpen] = useState(false);
   const [askAlalayOpportunity, setAskAlalayOpportunity] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [uploadModalPrefill, setUploadModalPrefill] = useState(null);
   const [addSourceModalOpen, setAddSourceModalOpen] = useState(false);
   const [activeDocumentForPreview, setActiveDocumentForPreview] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1486,6 +1593,14 @@ export const AppProvider = ({ children }) => {
     addToast('Document Removed', 'Removed document from digital vault.', 'info');
   };
 
+  // Opens the Document Vault upload sheet pre-filled for a specific missing requirement,
+  // so citizens can upload straight from a checklist (in chat or in the Documents tab)
+  // instead of hunting for the matching document type manually.
+  const openUploadForRequirement = (requirementName = '') => {
+    setUploadModalPrefill({ name: requirementName, type: guessDocumentTypeFromRequirement(requirementName) });
+    setUploadModalOpen(true);
+  };
+
   const [askAlalayInitialPrompt, setAskAlalayInitialPrompt] = useState('');
 
   const openAskAlalay = (opp = null, session = null, initialPrompt = '') => {
@@ -1536,6 +1651,11 @@ export const AppProvider = ({ children }) => {
         uploadNewDocument,
         replaceDocument,
         deleteDocument,
+        pinnedOpportunityIds,
+        togglePinOpportunity,
+        autoApplyQueue,
+        submitAutoApply,
+        dismissAutoApply,
         opportunities,
         categories: CATEGORIES,
         sources,
@@ -1572,6 +1692,9 @@ export const AppProvider = ({ children }) => {
         openAskAlalay,
         uploadModalOpen,
         setUploadModalOpen,
+        uploadModalPrefill,
+        setUploadModalPrefill,
+        openUploadForRequirement,
         addSourceModalOpen,
         setAddSourceModalOpen,
         activeDocumentForPreview,

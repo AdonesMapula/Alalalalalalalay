@@ -17,6 +17,8 @@ import {
   ArrowUpRight,
   Compass,
   Maximize2,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { askAlalayAI } from '../../services/geminiService';
@@ -127,13 +129,14 @@ import { AiMessageRenderer } from '../common/AiMessageRenderer';
 /**
  * Message Content Formatter: uses AiMessageRenderer for rich step cards and visual components
  */
-const FormattedAiMessage = ({ text, sourceUrl, matchedOpportunities = [], onOpenOpportunity }) => {
+const FormattedAiMessage = ({ text, sourceUrl, matchedOpportunities = [], onOpenOpportunity, onUploadDocument }) => {
   return (
     <AiMessageRenderer
       text={text}
       sourceUrl={sourceUrl}
       matchedOpportunities={matchedOpportunities}
       onOpenOpportunity={onOpenOpportunity}
+      onUploadDocument={onUploadDocument}
       size="sm"
     />
   );
@@ -156,6 +159,7 @@ export const AskAlalayChatModal = () => {
     setLoadedChatSession,
     saveChatArchive,
     addToast,
+    openUploadForRequirement,
   } = useApp();
 
   const [messages, setMessages] = useState([]);
@@ -269,7 +273,7 @@ export const AskAlalayChatModal = () => {
           {
             id: 'init_opp',
             sender: 'ai',
-            text: `Hello ${user?.firstName || 'there'}! I am grounded in official Citizen's Charters for **${opp.title}** (${opp.agency}). What would you like to know about this service?`,
+            text: `Hello ${user?.firstName || 'there'}! I have the official guidelines for **${opp.title}** (${opp.agency}). What would you like to know about this service?`,
             time: 'Just now',
             sourceUrl: opp.officialSource?.url || 'https://www.philhealth.gov.ph',
           },
@@ -282,7 +286,7 @@ export const AskAlalayChatModal = () => {
           {
             id: 'init_gen',
             sender: 'ai',
-            text: `Hi ${user?.firstName || 'there'}! I am ALALAY, your AI navigator grounded in verified Philippine government Citizen's Charters, scraped assistance programs, and statutory benefits. How can I assist you today?`,
+            text: `Hi ${user?.firstName || 'there'}! I am ALALAY, your AI navigator for verified Philippine government assistance programs and benefits. How can I assist you today?`,
             time: 'Just now',
           },
         ]);
@@ -301,6 +305,32 @@ export const AskAlalayChatModal = () => {
     setSelectedOpportunity(oppItem);
     setActiveTab('explore');
     setAskAlalayOpen(false);
+  };
+
+  const handleResponseFeedback = (messageId, value) => {
+    const updatedMessages = messages.map((message) => {
+      if (message.id !== messageId) return message;
+      return { ...message, feedback: message.feedback === value ? null : value };
+    });
+
+    setMessages(updatedMessages);
+
+    // Keep feedback in the saved chat when this conversation already exists.
+    if (
+      saveChatArchive &&
+      currentSessionId &&
+      updatedMessages.some((message) => message.sender === 'user')
+    ) {
+      const latestAiMessage = [...updatedMessages].reverse().find((message) => message.sender === 'ai');
+      saveChatArchive({
+        id: currentSessionId,
+        title: sessionTitle || (opp ? `Consultation: ${opp.title}` : 'Citizen Chat'),
+        preview: latestAiMessage?.text?.replace(/[#*•]/g, '').slice(0, 140) || '',
+        messageCount: updatedMessages.length,
+        sourceUrl: latestAiMessage?.sourceUrl || opp?.officialSource?.url || 'https://www.gov.ph',
+        messages: updatedMessages,
+      });
+    }
   };
 
   // Dynamic Suggestion Chips based on real Philippine assistance topics
@@ -341,7 +371,7 @@ export const AskAlalayChatModal = () => {
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </h3>
             <p className="text-[11px] text-blue-100 font-medium truncate max-w-[200px] sm:max-w-[260px]">
-              {opp ? opp.title : 'Official Citizen Charters & Benefits'}
+              {opp ? opp.title : 'Government Services & Benefits'}
             </p>
           </div>
         </div>
@@ -402,14 +432,52 @@ export const AskAlalayChatModal = () => {
                     ? 'bg-white border border-slate-200 text-slate-800 shadow-2xs w-full'
                     : 'bg-[#093a96] text-white font-medium rounded-br-none whitespace-pre-line'
                   }`}
-              >
+                >
                 {isAi ? (
-                  <FormattedAiMessage
-                    text={msg.text}
-                    sourceUrl={msg.sourceUrl}
-                    matchedOpportunities={msg.matchedOpportunities}
-                    onOpenOpportunity={handleOpenOpportunity}
-                  />
+                  <>
+                    <FormattedAiMessage
+                      text={msg.text}
+                      sourceUrl={msg.sourceUrl}
+                      matchedOpportunities={msg.matchedOpportunities}
+                      onOpenOpportunity={handleOpenOpportunity}
+                      onUploadDocument={openUploadForRequirement}
+                    />
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-3">
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {msg.feedback ? 'Thanks for the feedback.' : 'Was this helpful?'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleResponseFeedback(msg.id, 'good')}
+                          aria-label="Good response"
+                          aria-pressed={msg.feedback === 'good'}
+                          title="Good response"
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            msg.feedback === 'good'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                          }`}
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleResponseFeedback(msg.id, 'bad')}
+                          aria-label="Not a helpful response"
+                          aria-pressed={msg.feedback === 'bad'}
+                          title="Not a helpful response"
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            msg.feedback === 'bad'
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
+                          }`}
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   msg.text
                 )}
@@ -423,7 +491,7 @@ export const AskAlalayChatModal = () => {
             <div className="w-4 h-4 rounded-full bg-white p-0.5 flex items-center justify-center shadow-2xs animate-bounce">
               <img src={logoImg} alt="ALALAY" className="w-full h-full object-contain" />
             </div>
-            <span>ALALAY is analyzing scraped programs & charters...</span>
+            <span>ALALAY is checking government programs & guidelines...</span>
           </div>
         )}
 

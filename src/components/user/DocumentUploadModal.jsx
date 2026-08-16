@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   UploadCloud,
   FileText,
@@ -24,6 +24,8 @@ export const DocumentUploadModal = () => {
   const {
     uploadModalOpen,
     setUploadModalOpen,
+    uploadModalPrefill,
+    setUploadModalPrefill,
     uploadNewDocument,
     user,
     setUser,
@@ -41,6 +43,16 @@ export const DocumentUploadModal = () => {
   const [syncToProfile, setSyncToProfile] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Pre-fill the form when opened from a specific missing requirement (e.g. from a
+  // checklist in chat or on the opportunity page), so the citizen doesn't have to
+  // re-select the document type manually.
+  useEffect(() => {
+    if (uploadModalOpen && uploadModalPrefill) {
+      setDocName(uploadModalPrefill.name || '');
+      setDocType(uploadModalPrefill.type || 'National ID / Gov ID');
+    }
+  }, [uploadModalOpen, uploadModalPrefill]);
 
   const documentTypes = [
     'National ID / Gov ID',
@@ -145,6 +157,7 @@ export const DocumentUploadModal = () => {
       setSelectedFile(null);
       setOcrResult(null);
       setUploadModalOpen(false);
+      if (setUploadModalPrefill) setUploadModalPrefill(null);
     }, 900);
   };
 
@@ -154,6 +167,7 @@ export const DocumentUploadModal = () => {
       onClose={() => {
         setUploadModalOpen(false);
         setOcrResult(null);
+        if (setUploadModalPrefill) setUploadModalPrefill(null);
       }}
       title="DocAgent Document Vault"
       subtitle="Autonomous OCR, Attribute Extraction & Vault Sync"

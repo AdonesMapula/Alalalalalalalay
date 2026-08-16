@@ -465,6 +465,32 @@ function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
     );
   }
 
+  // 2.5 INTENT ANALYSIS: PHILHEALTH MRF / PMRF / MEMBER REGISTRATION
+  const isPhilHealthMrfQuery =
+    normQ.includes('mrf') ||
+    normQ.includes('pmrf') ||
+    (normQ.includes('philhealth') && (normQ.includes('registration') || normQ.includes('register') || normQ.includes('member data record') || normQ.includes('mdr') || normQ.includes('form')));
+
+  if (isPhilHealthMrfQuery) {
+    return (
+      `**How to Get Your PhilHealth Member Registration Form (PMRF)**\n\n` +
+      `The PMRF is the official form used to register as a new PhilHealth member or update your existing membership details. It is issued and processed by the **Philippine Health Insurance Corporation (PhilHealth)**.\n\n` +
+      `**Where to Get the PMRF:**\n` +
+      `• **Online:** Register directly through the PhilHealth Member Portal at member.philhealth.gov.ph — no physical PMRF needed for new online registrations.\n` +
+      `• **Download:** A fillable PMRF PDF is available at philhealth.gov.ph under Member Registration.\n` +
+      `• **Walk-in:** Free copies are available at any PhilHealth Local Health Insurance Office (LHIO) or Malasakit Center desk.\n\n` +
+      `**Step-by-Step Procedure:**\n` +
+      `1. Step 1 (Choose Channel): Register online via the Member Portal, or get a physical PMRF copy from a PhilHealth LHIO.\n` +
+      `2. Step 2 (Fill Out Form): Provide your complete personal details, employment status, and at least one valid government ID.\n` +
+      `3. Step 3 (Submit): Submit online, or in person at the nearest PhilHealth office together with a valid ID.\n` +
+      `4. Step 4 (Get Your PIN): Receive your PhilHealth Identification Number (PIN) and Member Data Record (MDR), which serves as proof of active membership.\n\n` +
+      `**Processing Time & Fees:**\n` +
+      `• **Fee:** 100% Free of charge.\n` +
+      `• **Turnaround:** Immediate for online registration; same-day for walk-in applications.\n\n` +
+      `Official Portal: https://www.philhealth.gov.ph`
+    );
+  }
+
   // 3. INTENT ANALYSIS: SENIOR CITIZEN ID / OSCA / RA 9994
   const isSeniorIdQuery =
     normQ.includes('senior') ||

@@ -1,6 +1,9 @@
 // Deterministic Eligibility Rules Engine & Multi-Factor Coverage-Gap Matching
 // Layer 1 of AI Guardrails: Zero AI Hallucination for Financial Calculations & Citizen Benefits
 
+export const MINIMUM_DISPLAY_MATCH_SCORE = 80;
+export const TOP_MATCH_SCORE = 90;
+
 export const AUTHORITATIVE_BENEFITS = [
   {
     id: 'benefit-doh-map-01',
@@ -415,7 +418,7 @@ export function matchOpportunityForCitizen(opp, user = null, documents = []) {
   }
 
   const totalCalculatedScore = demographicScore + economicScore + documentScore + citizenshipScore;
-  const finalScore = Math.max(45, Math.min(99, totalCalculatedScore));
+  const finalScore = Math.max(45, Math.min(100, totalCalculatedScore));
   const docReadinessPercent = reqList.length > 0 ? Math.round((matchedDocCount / reqList.length) * 100) : 100;
 
   return {
@@ -457,12 +460,38 @@ export function rankAndFilterOpportunities(opportunities = [], user = null, docu
 }
 
 /**
+ * Selects the ranked opportunities a citizen has authorized the AI to auto-apply to,
+ * based on their Auto-Apply profile settings. Only a perfect (100%) match qualifies —
+ * this already implies full document-locker completion, since matchScore can only reach
+ * 100 when every scoring dimension (including document readiness) is maxed out.
+ *
+ * Jobs & employment postings (category 'employment') are gated behind their own stricter
+ * opt-in (`autoApplyIncludeJobs`) plus a redundant explicit documents-ready check, since a
+ * citizen may reasonably want auto-apply for benefits without also authorizing job applications.
+ */
+export function getAutoApplyMatches(rankedOpportunities = [], user = null) {
+  if (!user?.autoApplyEnabled) return [];
+  const allowedCategories = Array.isArray(user.autoApplyCategories) ? user.autoApplyCategories : [];
+
+  return (rankedOpportunities || []).filter((opp) => {
+    if ((opp.matchScore || 0) < 100) return false;
+    const category = (opp.category || '').toLowerCase();
+
+    if (category === 'employment') {
+      return Boolean(user.autoApplyIncludeJobs) && opp.docReadinessPercent === 100;
+    }
+
+    return allowedCategories.includes(category);
+  });
+}
+
+/**
  * Executive readiness summary for Citizen Dashboard
  */
 export function getCitizenReadinessSummary(user, documents = [], opportunities = []) {
   const userAge = calculateCitizenAge(user);
   const ranked = rankAndFilterOpportunities(opportunities, user, documents);
-  const topMatches = ranked.filter((o) => (o.matchScore || 0) >= 88);
+  const topMatches = ranked.filter((o) => (o.matchScore || 0) >= MINIMUM_DISPLAY_MATCH_SCORE);
   const fullyDocumented = ranked.filter((o) => o.docReadinessPercent === 100);
 
   return {

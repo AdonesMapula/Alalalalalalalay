@@ -20,11 +20,16 @@ import {
   Zap,
   Calendar,
   Award,
+  X,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { IOSButton } from '../common/IOSButton';
-import { rankAndFilterOpportunities, calculateCitizenAge } from '../../services/rulesEngine';
+import {
+  rankAndFilterOpportunities,
+  calculateCitizenAge,
+  MINIMUM_DISPLAY_MATCH_SCORE,
+} from '../../services/rulesEngine';
 
 export const HomeDashboard = () => {
   const {
@@ -35,15 +40,30 @@ export const HomeDashboard = () => {
     openAskAlalay,
     user,
     documents,
+    autoApplyQueue,
+    submitAutoApply,
+    dismissAutoApply,
   } = useApp();
 
   const userAge = calculateCitizenAge(user);
   const isSenior = Boolean(user?.isSeniorCitizen || user?.is_senior_citizen || userAge >= 60);
 
+  const pendingAutoApplyEntries = useMemo(() => {
+    return (autoApplyQueue || [])
+      .filter((entry) => entry.status === 'ready_to_submit')
+      .map((entry) => ({ ...entry, opp: opportunities.find((o) => o.id === entry.oppId) }))
+      .filter((entry) => entry.opp);
+  }, [autoApplyQueue, opportunities]);
+
   // Deterministically rank and match opportunities for this specific citizen's profile
   const rankedOpportunities = useMemo(() => {
     return rankAndFilterOpportunities(opportunities, user, documents);
   }, [opportunities, user, documents]);
+
+  const visibleOpportunities = useMemo(
+    () => rankedOpportunities.filter((opp) => (opp.matchScore || 0) >= MINIMUM_DISPLAY_MATCH_SCORE),
+    [rankedOpportunities]
+  );
 
   const categoryChips = [
     { id: 'health', name: 'Health & Medical', icon: HeartPulse },
@@ -69,7 +89,7 @@ export const HomeDashboard = () => {
 
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{opportunities?.length || 0} Live Ingested Services</span>
+              <span>{opportunities?.length || 0} Live Services</span>
             </div>
 
             {isSenior && (
@@ -108,7 +128,7 @@ export const HomeDashboard = () => {
               onClick={() => setActiveTab('explore')}
               className="px-5 py-2.5 rounded-full bg-white text-[#0f172a] text-sm font-semibold border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer inline-flex items-center gap-1.5"
             >
-              <span>Explore All ({opportunities?.length || 0})</span>
+              <span>Explore All ({visibleOpportunities.length})</span>
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </button>
           </div>
@@ -143,6 +163,67 @@ export const HomeDashboard = () => {
           >
             View Senior Programs →
           </button>
+        </div>
+      )}
+
+      {/* Auto-Apply Queue: 100% matches ALALAY prepared and is waiting on you to submit */}
+      {pendingAutoApplyEntries.length > 0 && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-orange-50/80 border border-orange-200/90 space-y-3 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-orange-200/80 text-orange-900 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-bold text-orange-950">
+                Auto-Apply: {pendingAutoApplyEntries.length} Ready to Submit
+              </h4>
+              <p className="text-[11px] text-orange-800">
+                ALALAY found 100% matches and prepared these — review and submit whenever you're ready.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {pendingAutoApplyEntries.map((entry) => (
+              <div
+                key={entry.oppId}
+                className="p-3 rounded-xl bg-white border border-orange-200/80 flex items-center justify-between gap-3 flex-wrap"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#1C1C1E] truncate">{entry.opp.title}</p>
+                  <p className="text-[10px] text-slate-500 truncate">{entry.opp.agency || 'Government Service'} • 100% Match</p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOpportunity(entry.opp)}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    Review
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = entry.opp.officialSource?.url;
+                      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                      submitAutoApply(entry.oppId);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#093a96] hover:bg-[#072d75] text-white text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    Submit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dismissAutoApply(entry.oppId)}
+                    aria-label="Dismiss"
+                    className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -192,7 +273,7 @@ export const HomeDashboard = () => {
               {isSenior ? 'Recommended for Senior Citizens' : 'Recommended for You'}
             </h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Intelligently matched and ranked based on your verified credentials, age ({userAge} yrs), citizenship, and Document Locker
+              Showing services that best fit your profile.
             </p>
           </div>
 
@@ -201,12 +282,12 @@ export const HomeDashboard = () => {
             onClick={() => setActiveTab('explore')}
             className="text-xs font-bold text-[#093a96] hover:underline cursor-pointer"
           >
-            Browse All ({rankedOpportunities.length})
+            Browse All ({visibleOpportunities.length})
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {rankedOpportunities.map((opp, idx) => {
+          {visibleOpportunities.map((opp, idx) => {
             const topColor = opp.isSeniorPriority ? '#f59e0b' : topColors[idx % topColors.length];
             const IconComp = iconsList[idx % iconsList.length];
             const rawUrl = opp.officialSource?.url || '';

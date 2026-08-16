@@ -26,6 +26,7 @@ import {
   Maximize2,
   Award,
   AlertCircle,
+  UploadCloud,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSButton } from '../common/IOSButton';
@@ -38,8 +39,8 @@ import { AiMessageRenderer } from '../common/AiMessageRenderer';
 /**
  * Message Formatter for Side AI Chat with Card-Based Stepper & Interactive Deck
  */
-const SideAiMessageRenderer = ({ text, sourceUrl }) => {
-  return <AiMessageRenderer text={text} sourceUrl={sourceUrl} size="sm" />;
+const SideAiMessageRenderer = ({ text, sourceUrl, onUploadDocument }) => {
+  return <AiMessageRenderer text={text} sourceUrl={sourceUrl} onUploadDocument={onUploadDocument} size="sm" />;
 };
 
 export const OpportunityDetailModal = () => {
@@ -56,9 +57,8 @@ export const OpportunityDetailModal = () => {
     setActiveTab,
     setLoadedChatSession,
     addToast,
+    openUploadForRequirement,
   } = useApp();
-
-  const [manualChecks, setManualChecks] = useState({});
 
   // Side AI Chat State
   const [isSideChatOpen, setIsSideChatOpen] = useState(false);
@@ -99,7 +99,7 @@ export const OpportunityDetailModal = () => {
           {
             id: 'init_side',
             sender: 'ai',
-            text: `Hi ${user?.firstName || 'there'}! I am grounded in the official Citizen's Charter for **${opp.title}** (${opp.agency}). Ask me about eligibility, required documents, or step-by-step application instructions.`,
+            text: `Hi ${user?.firstName || 'there'}! I have the official guidelines for **${opp.title}** (${opp.agency}). Ask me about eligibility, required documents, or step-by-step application instructions.`,
             time: 'Just now',
             sourceUrl: opp.officialSource?.url || 'https://www.gov.ph',
           },
@@ -138,13 +138,6 @@ export const OpportunityDetailModal = () => {
           'Official program entitlement',
           'Direct government agency support',
         ];
-
-  const toggleCheck = (idx) => {
-    setManualChecks((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
-  };
 
   const handleSendSideMessage = async (textToSend) => {
     const text = textToSend || sideInput.trim();
@@ -210,7 +203,7 @@ export const OpportunityDetailModal = () => {
       const errMsg = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
-        text: 'ALALAY is grounded in verified Citizen Charters. Please check with your nearest government agency branch or hospital Malasakit Center desk.',
+        text: 'ALALAY uses verified official guidelines. Please check with your nearest government agency branch or hospital Malasakit Center desk.',
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       };
       setSideMessages((prev) => [...prev, errMsg]);
@@ -505,10 +498,9 @@ export const OpportunityDetailModal = () => {
                   <span>Document Locker & Requirements Checklist</span>
                 </h3>
                 <span className="text-xs font-semibold text-slate-500">
-                  {requirementsList.filter((req, i) => {
+                  {requirementsList.filter((req) => {
                     const reqText = typeof req === 'string' ? req : req.name;
-                    const isAuto = !!matchRequirementWithUserDoc(reqText, documents, user);
-                    return manualChecks[i] !== undefined ? manualChecks[i] : isAuto;
+                    return !!matchRequirementWithUserDoc(reqText, documents, user);
                   }).length} of {requirementsList.length} Ready
                 </span>
               </div>
@@ -517,17 +509,18 @@ export const OpportunityDetailModal = () => {
                 {requirementsList.map((req, idx) => {
                   const reqText = typeof req === 'string' ? req : req.name;
                   const matchedDoc = matchRequirementWithUserDoc(reqText, documents, user);
-                  const isAutoMatched = !!matchedDoc;
-                  const isChecked = manualChecks[idx] !== undefined ? manualChecks[idx] : isAutoMatched;
+                  const isChecked = !!matchedDoc;
 
                   return (
                     <div
                       key={idx}
-                      onClick={() => toggleCheck(idx)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-4 ${
+                      onClick={() => {
+                        if (!isChecked && openUploadForRequirement) openUploadForRequirement(reqText);
+                      }}
+                      className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-4 ${
                         isChecked
                           ? 'bg-emerald-50/40 border-emerald-200'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
+                          : 'bg-white border-slate-200 hover:border-slate-300 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -556,8 +549,21 @@ export const OpportunityDetailModal = () => {
                               <span>Auto-Verified in Locker: {matchedDoc.name}</span>
                             </div>
                           ) : (
-                            <div className="text-[10px] text-slate-400 font-medium">
-                              Not found in Document Locker. Upload file or check manually.
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                Not found in Document Locker.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (openUploadForRequirement) openUploadForRequirement(reqText);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#093a96] text-[10px] font-bold transition-colors cursor-pointer"
+                              >
+                                <UploadCloud className="w-3 h-3" />
+                                <span>Upload Document</span>
+                              </button>
                             </div>
                           )}
                         </div>
@@ -718,7 +724,7 @@ export const OpportunityDetailModal = () => {
                       }`}
                     >
                       {isAi ? (
-                        <SideAiMessageRenderer text={msg.text} sourceUrl={msg.sourceUrl} />
+                        <SideAiMessageRenderer text={msg.text} sourceUrl={msg.sourceUrl} onUploadDocument={openUploadForRequirement} />
                       ) : (
                         <p className="text-xs leading-relaxed">{msg.text}</p>
                       )}

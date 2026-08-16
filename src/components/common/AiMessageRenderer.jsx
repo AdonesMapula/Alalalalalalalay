@@ -15,6 +15,7 @@ import {
   ListOrdered,
   Building2,
   FileText,
+  UploadCloud,
 } from 'lucide-react';
 
 /**
@@ -113,8 +114,9 @@ function parseAiContent(text = '', sourceUrl = '') {
       continue;
     }
 
-    // Bullet points (•, -, *)
-    if (raw.startsWith('•') || raw.startsWith('-') || raw.startsWith('*')) {
+    // Bullet points (•, - , * ) — require a space after the marker so a bold-only
+    // heading line like "**Title** (Agency)" isn't mistaken for a "*" bullet.
+    if (raw.startsWith('•') || raw.startsWith('- ') || raw.startsWith('* ')) {
       flushSteps();
       currentBullets.push(raw.replace(/^[•\-\*]\s*/, ''));
       continue;
@@ -303,6 +305,7 @@ export const AiMessageRenderer = ({
   sourceUrl = '',
   matchedOpportunities = [],
   onOpenOpportunity = null,
+  onUploadDocument = null,
   size = 'md',
 }) => {
   const [copied, setCopied] = useState(false);
@@ -361,11 +364,12 @@ export const AiMessageRenderer = ({
                 const isMet = item.includes('✓') || item.toLowerCase().includes('verified in vault') || item.toLowerCase().includes('verified in profile');
                 const isAction = item.includes('✗') || item.toLowerCase().includes('action required') || item.toLowerCase().includes('missing');
                 const cleanItem = item.replace(/^[•\-\*]\s*/, '');
+                const requirementName = cleanItem.replace(/—\s*(✓|✗).*$/, '').trim();
 
                 return (
                   <div
                     key={bIdx}
-                    className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 text-[11px] sm:text-xs font-medium transition-all shadow-2xs ${
+                    className={`p-2.5 rounded-xl border flex flex-col gap-2 text-[11px] sm:text-xs font-medium transition-all shadow-2xs ${
                       isMet
                         ? 'bg-emerald-50/80 border-emerald-200/90 text-emerald-950'
                         : isAction
@@ -373,28 +377,41 @@ export const AiMessageRenderer = ({
                         : 'bg-slate-50 border-slate-200 text-slate-800'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {isMet ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                      ) : isAction ? (
-                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                      ) : (
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] flex-shrink-0" />
-                      )}
-                      <span className="truncate leading-snug">{renderFormattedInlineText(cleanItem.replace(/—\s*(✓|✗).*$/, ''))}</span>
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isMet ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        ) : isAction ? (
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                        ) : (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] flex-shrink-0" />
+                        )}
+                        <span className="truncate leading-snug">{renderFormattedInlineText(requirementName)}</span>
+                      </div>
+
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider flex-shrink-0 ${
+                          isMet
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : isAction
+                            ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                            : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {isMet ? '✓ In Vault' : isAction ? 'Action Required' : 'Requirement'}
+                      </span>
                     </div>
 
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider flex-shrink-0 ${
-                        isMet
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : isAction
-                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {isMet ? '✓ In Vault' : isAction ? 'Action Required' : 'Requirement'}
-                    </span>
+                    {isAction && onUploadDocument && (
+                      <button
+                        type="button"
+                        onClick={() => onUploadDocument(requirementName)}
+                        className="self-start inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        <UploadCloud className="w-3 h-3" />
+                        <span>Upload Document</span>
+                      </button>
+                    )}
                   </div>
                 );
               })}
