@@ -7,6 +7,7 @@ import {
   Circle,
   Printer,
   Save,
+  Download,
   ArrowLeft,
   Sparkles,
   User,
@@ -30,7 +31,10 @@ import {
   generateOpeningGreeting,
   getSessionStats,
   INTAKE_FORM_TEMPLATES,
-} from '../../services/agentIntakeService';
+  generateDocFormattedHtml,
+  downloadApplicationAsDoc,
+  printApplicationDocument,
+} from '../../services/applyAiService';
 import logoImg from '../../assets/logos.png';
 
 // =============================================================================
@@ -520,7 +524,31 @@ const FormReview = ({ program, session, user, onBack, onSave, isSaving }) => {
   const stats = getSessionStats(session);
 
   const handlePrint = () => {
-    window.print();
+    printApplicationDocument(
+      {
+        name: session.template.title,
+        programTitle: program.title,
+        issuer: program.agency,
+        template: session.template,
+        applicationData: editableFields,
+        filledFields: session.filledFields,
+      },
+      user
+    );
+  };
+
+  const handleDownloadDoc = () => {
+    downloadApplicationAsDoc(
+      {
+        name: session.template.title,
+        programTitle: program.title,
+        issuer: program.agency,
+        template: session.template,
+        applicationData: editableFields,
+        filledFields: session.filledFields,
+      },
+      user
+    );
   };
 
   const sourceColor = {
@@ -533,7 +561,7 @@ const FormReview = ({ program, session, user, onBack, onSave, isSaving }) => {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 bg-white flex-shrink-0">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-200 bg-white flex-shrink-0 flex-wrap sm:flex-nowrap">
         <button
           type="button"
           onClick={onBack}
@@ -541,22 +569,31 @@ const FormReview = ({ program, session, user, onBack, onSave, isSaving }) => {
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-[180px]">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             <h2 className="text-base font-extrabold text-slate-900">Application Complete</h2>
           </div>
           <p className="text-xs text-slate-500">{session.template.title}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => onSave(editableFields)}
             disabled={isSaving}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer disabled:opacity-50"
           >
-            {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            {isSaving ? 'Saving...' : 'Save Draft'}
+            {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-600" /> : <Save className="w-3.5 h-3.5 text-emerald-600" />}
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadDoc}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+            title="Download formatted DOC file"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Download</span> .DOC
           </button>
           <button
             type="button"
@@ -733,7 +770,7 @@ const PrintStyle = () => (
 // MAIN COMPONENT
 // =============================================================================
 export const ApplicationIntakeAgent = ({ preselectedBenefitId = null }) => {
-  const { user, documents, addToast } = useApp();
+  const { user, documents, addToast, uploadNewDocument, updateDocument, setActiveTab, setActiveDocumentForPreview } = useApp();
   const [phase, setPhase] = useState('select'); // 'select' | 'intake' | 'review'
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [session, setSession] = useState(null);
@@ -751,16 +788,72 @@ export const ApplicationIntakeAgent = ({ preselectedBenefitId = null }) => {
     setPhase('review');
   };
 
-  const handleSaveDraft = async (editableFields) => {
+  const handleSave = async (editableFields) => {
+    if (!selectedProgram || !session) return;
     setIsSaving(true);
     try {
-      // Merge edited values back into session
-      const updatedData = { ...editableFields };
-      // In a full implementation, this would call saveAgentApplication(session, updatedData)
-      await new Promise((r) => setTimeout(r, 800)); // simulate save
-      addToast('Draft saved successfully!', 'success');
+      const docName = `${selectedProgram.shortTitle || selectedProgram.title} Application Form`;
+      const docId = session.documentId || `doc_app_${selectedProgram.id}_${Date.now()}`;
+
+      // Check if this application document already exists in vault
+      const existingDoc = documents.find(
+        (d) => d.id === session.documentId || (d.programId === selectedProgram.id && d.isApplicationForm)
+      );
+
+      const docPayload = {
+        id: existingDoc ? existingDoc.id : docId,
+        name: docName,
+        type: 'Application Form',
+        category: selectedProgram.category || 'Government Application',
+        issuer: selectedProgram.agency,
+        documentNumber: existingDoc?.documentNumber || `APP-${selectedProgram.id.toUpperCase().slice(0, 5)}-${Date.now().toString().slice(-4)}`,
+        expirationDate: 'Permanent',
+        fileSize: '1.2 MB',
+        fileType: 'DOC Form',
+        status: 'Valid',
+        verifiedBadge: 'AI Intake Completed ✓',
+        uploadedAt: existingDoc ? 'Updated via AI Intake Agent' : 'Created via AI Intake Agent',
+        isApplicationForm: true,
+        programId: selectedProgram.id,
+        programTitle: selectedProgram.title,
+        programIcon: selectedProgram.icon,
+        programAgency: selectedProgram.agency,
+        template: session.template,
+        applicationData: editableFields,
+        attributes: editableFields,
+        filledFields: Object.fromEntries(
+          (session.template?.fields || []).map((f) => [
+            f.id,
+            {
+              value: editableFields[f.id] || '',
+              source: session.filledFields[f.id]?.source || 'conversation',
+            },
+          ])
+        ),
+        thumbnail: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400&auto=format&fit=crop&q=80',
+      };
+
+      docPayload.docContent = generateDocFormattedHtml(docPayload, user);
+
+      if (existingDoc && updateDocument) {
+        updateDocument(existingDoc.id, docPayload);
+      } else if (uploadNewDocument) {
+        uploadNewDocument(docPayload, { silent: true });
+      }
+
+      setSession((prev) => ({
+        ...prev,
+        documentId: docPayload.id,
+      }));
+
+      addToast(
+        'Application Saved',
+        `Saved "${docName}" to your Documents vault. You can view or edit it anytime from the Documents tab.`,
+        'success',
+        6000
+      );
     } catch {
-      addToast('Could not save draft. Please try again.', 'error');
+      addToast('Could not save application', 'Please try again.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -800,7 +893,7 @@ export const ApplicationIntakeAgent = ({ preselectedBenefitId = null }) => {
           session={session}
           user={user}
           onBack={handleBackToIntake}
-          onSave={handleSaveDraft}
+          onSave={handleSave}
           isSaving={isSaving}
         />
       )}
