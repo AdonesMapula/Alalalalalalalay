@@ -1,6 +1,9 @@
 // Deterministic Eligibility Rules Engine & Multi-Factor Coverage-Gap Matching
 // Layer 1 of AI Guardrails: Zero AI Hallucination for Financial Calculations & Citizen Benefits
 
+export const MINIMUM_DISPLAY_MATCH_SCORE = 80;
+export const TOP_MATCH_SCORE = 90;
+
 export const AUTHORITATIVE_BENEFITS = [
   {
     id: 'benefit-doh-map-01',
@@ -130,6 +133,8 @@ export function matchRequirementWithUserDoc(reqName, userDocs = [], user = null)
     const isDocOsca = hasWord(docMeta, /\b(osca|senior citizen id|senior id)\b/i);
     const isDocPwd = hasWord(docMeta, /\b(pwd id|disability id|pwd card)\b/i);
     const isDocBirth = hasWord(docMeta, /\b(birth certificate|psa birth|psa marriage|nso)\b/i);
+    const isDocPds = hasWord(docMeta, /\b(personal data sheet|csc form 212|pds)\b/i);
+    const isDocCscEligibility = hasWord(docMeta, /\b(civil service eligibility|csc eligibility|career service eligibility)\b/i);
 
     // 2. Strict Requirement-to-Document Assignment Guardrails
 
@@ -185,7 +190,19 @@ export function matchRequirementWithUserDoc(reqName, userDocs = [], user = null)
       continue;
     }
 
-    // I. Requirement: Online Accounts / Portals (e.g. Active My.SSS, Bank Account)
+    // I. Requirement: Personal Data Sheet (CSC Form 212) — government job applications
+    if (hasWord(q, /\b(personal data sheet|csc form 212|pds)\b/i)) {
+      if (isDocPds) return doc;
+      continue;
+    }
+
+    // J. Requirement: Civil Service / Career Service Eligibility (Sub-Professional / Professional)
+    if (hasWord(q, /\b(civil service|career service|sub-professional|professional eligibility|csc eligibility)\b/i)) {
+      if (isDocCscEligibility) return doc;
+      continue;
+    }
+
+    // K. Requirement: Online Accounts / Portals (e.g. Active My.SSS, Bank Account)
     if (hasWord(q, /\b(active my\.sss|sss account|disbursement account|bank account|online portal|e-wallet)\b/i)) {
       continue; // External portal accounts are not locker document uploads
     }
@@ -415,7 +432,7 @@ export function matchOpportunityForCitizen(opp, user = null, documents = []) {
   }
 
   const totalCalculatedScore = demographicScore + economicScore + documentScore + citizenshipScore;
-  const finalScore = Math.max(45, Math.min(99, totalCalculatedScore));
+  const finalScore = Math.max(45, Math.min(100, totalCalculatedScore));
   const docReadinessPercent = reqList.length > 0 ? Math.round((matchedDocCount / reqList.length) * 100) : 100;
 
   return {
@@ -456,13 +473,45 @@ export function rankAndFilterOpportunities(opportunities = [], user = null, docu
   });
 }
 
+// Minimum score for Auto-Apply to consider a match strong enough to act on.
+export const AUTO_APPLY_MIN_SCORE = 95;
+
+/**
+ * Selects the ranked opportunities a citizen has authorized the AI to auto-apply to,
+ * based on their Auto-Apply profile settings. Qualifies when the opportunity is both
+ * "Likely Eligible" and scores AUTO_APPLY_MIN_SCORE (95%) or higher — a near-perfect
+ * match already implies near-complete document-locker coverage, since matchScore only
+ * reaches that range when most/all scoring dimensions (including documents) are maxed.
+ *
+ * Jobs & employment postings (category 'employment') are gated behind their own stricter
+ * opt-in (`autoApplyIncludeJobs`) plus a redundant explicit documents-ready check, since a
+ * citizen may reasonably want auto-apply for benefits without also authorizing job applications.
+ */
+export function getAutoApplyMatches(rankedOpportunities = [], user = null) {
+  if (!user?.autoApplyEnabled) return [];
+  const allowedCategories = Array.isArray(user.autoApplyCategories) ? user.autoApplyCategories : [];
+
+  return (rankedOpportunities || []).filter((opp) => {
+    const isStrongMatch = (opp.matchScore || 0) >= AUTO_APPLY_MIN_SCORE && opp.matchStatus === 'Likely Eligible';
+    if (!isStrongMatch) return false;
+
+    const category = (opp.category || '').toLowerCase();
+
+    if (category === 'employment') {
+      return Boolean(user.autoApplyIncludeJobs) && opp.docReadinessPercent === 100;
+    }
+
+    return allowedCategories.includes(category);
+  });
+}
+
 /**
  * Executive readiness summary for Citizen Dashboard
  */
 export function getCitizenReadinessSummary(user, documents = [], opportunities = []) {
   const userAge = calculateCitizenAge(user);
   const ranked = rankAndFilterOpportunities(opportunities, user, documents);
-  const topMatches = ranked.filter((o) => (o.matchScore || 0) >= 88);
+  const topMatches = ranked.filter((o) => (o.matchScore || 0) >= MINIMUM_DISPLAY_MATCH_SCORE);
   const fullyDocumented = ranked.filter((o) => o.docReadinessPercent === 100);
 
   return {

@@ -1,16 +1,17 @@
 import React from 'react';
 import { Home, Compass, Sparkles, MessageSquare, FolderLock, ClipboardList } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import aiLogoImg from '../../assets/AIlogos.png';
 
 export const BottomTabBar = () => {
-  const { activeTab, setActiveTab, openAskAlalay, unreadCount } = useApp();
+  const { activeTab, setActiveTab, openAskAlalay, unreadCount, t } = useApp();
 
   const tabs = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'explore', label: 'Explore', icon: Compass },
+    { id: 'home', label: t('nav.home'), icon: Home },
+    { id: 'explore', label: t('nav.explore'), icon: Compass },
     { id: 'assistant', label: 'ALALAY', icon: Sparkles, isAi: true },
-    { id: 'apply', label: 'Apply', icon: ClipboardList },
-    { id: 'documents', label: 'Docs', icon: FolderLock },
+    { id: 'chat-history', label: t('nav.tab.archives'), icon: MessageSquare },
+    { id: 'documents', label: t('nav.tab.docs'), icon: FolderLock },
   ];
 
   return (
@@ -27,10 +28,12 @@ export const BottomTabBar = () => {
               onClick={() => openAskAlalay()}
               className="flex flex-col items-center justify-center -mt-5 group cursor-pointer"
             >
-              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#007AFF] via-[#5856D6] to-[#AF52DE] text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 group-active:scale-95 ios-spring">
-                <Sparkles className="w-6 h-6 animate-pulse-subtle" />
+              <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#007AFF] via-[#5856D6] to-[#AF52DE] p-0.5 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 group-active:scale-95 ios-spring">
+                <div className="w-full h-full rounded-full bg-white p-1 flex items-center justify-center overflow-hidden">
+                  <img src={aiLogoImg} alt="Ask AI" className="w-full h-full object-contain" />
+                </div>
               </div>
-              <span className="text-[10px] font-bold text-[#5856D6] mt-1">Ask AI</span>
+              <span className="text-[10px] font-bold text-[#5856D6] mt-1">{t('nav.askAi')}</span>
             </button>
           );
         }

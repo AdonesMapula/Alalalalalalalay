@@ -3,7 +3,7 @@ import {
   fetchKnowledgeSources,
   createAuditLog,
   isSupabaseConfigured,
-} from '../lib/supabase';
+} from '../lib/supabase.js';
 
 /**
  * Official Allowlist for Ingestion Safeguards (Tier A & Tier B Official Sources Only)

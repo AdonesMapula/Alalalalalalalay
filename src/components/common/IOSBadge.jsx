@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, CheckCircle2, AlertTriangle, ShieldCheck, Check } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 
 export const IOSBadge = ({
   variant = 'blue', // blue | green | orange | red | purple | gray | egov
@@ -48,23 +49,25 @@ export const EgovVerifiedBadge = () => {
 };
 
 export const EligibilityStatusBadge = ({ status }) => {
+  const { t } = useApp();
+
   if (status === 'Likely Eligible' || status === 'Eligible') {
     return (
       <IOSBadge variant="green" icon={<CheckCircle2 className="w-3.5 h-3.5" />}>
-        Likely Eligible
+        {t('common.likelyEligible')}
       </IOSBadge>
     );
   }
   if (status === 'Possibly Eligible') {
     return (
       <IOSBadge variant="blue" icon={<Sparkles className="w-3.5 h-3.5" />}>
-        Possibly Eligible
+        {t('common.possiblyEligible')}
       </IOSBadge>
     );
   }
   return (
     <IOSBadge variant="orange" icon={<AlertTriangle className="w-3.5 h-3.5" />}>
-      {status || 'Needs Review'}
+      {status && status !== 'Needs Review' ? status : t('common.needsReview')}
     </IOSBadge>
   );
 };

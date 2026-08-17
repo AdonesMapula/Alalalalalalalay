@@ -26,15 +26,17 @@ export const Sidebar = () => {
     setAdminTab,
     reviewQueue,
     logout,
+    t,
   } = useApp();
 
   const citizenNav = [
-    { id: 'home', label: 'Home', icon: Home },
-    { id: 'explore', label: 'Explore', icon: Compass },
-    { id: 'apply', label: 'Apply with AI', icon: ClipboardList, isNew: true },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'chat-history', label: 'Chat Archives', icon: MessageSquare },
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'home', label: t('nav.home'), icon: Home },
+    { id: 'explore', label: t('nav.explore'), icon: Compass },
+    { id: 'ai-chat', label: t('nav.aiChat'), icon: Sparkles },
+    { id: 'apply', label: t('nav.apply'), icon: ClipboardList, isNew: true },
+    { id: 'documents', label: t('nav.documents'), icon: FileText },
+    { id: 'chat-history', label: t('nav.chatArchives'), icon: MessageSquare },
+    { id: 'profile', label: t('nav.profile'), icon: User },
   ];
 
   const adminNav = [
@@ -64,8 +66,8 @@ export const Sidebar = () => {
                   type="button"
                   onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${isActive
-                      ? 'bg-[#093a96] text-white shadow-md shadow-blue-900/20 font-bold'
-                      : 'text-slate-600 hover:text-[#093a96] hover:bg-slate-50'
+                    ? 'bg-[#093a96] text-white shadow-md shadow-blue-900/20 font-bold'
+                    : 'text-slate-600 hover:text-[#093a96] hover:bg-slate-50'
                     }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
@@ -89,8 +91,8 @@ export const Sidebar = () => {
                   type="button"
                   onClick={() => setAdminTab(item.id)}
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 cursor-pointer ${isActive
-                      ? 'bg-slate-900 text-white shadow-sm font-bold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'bg-slate-900 text-white shadow-sm font-bold'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                     }`}
                 >
                   <div className="flex items-center gap-3">
@@ -117,7 +119,7 @@ export const Sidebar = () => {
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer"
         >
           <Settings className="w-4 h-4 text-slate-400" />
-          <span>Settings</span>
+          <span>{t('nav.settings')}</span>
         </button>
 
         <button
@@ -126,7 +128,7 @@ export const Sidebar = () => {
           className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
         >
           <LogOut className="w-4 h-4 text-rose-500" />
-          <span>Log Out</span>
+          <span>{t('nav.logOut')}</span>
         </button>
       </div>
     </aside>

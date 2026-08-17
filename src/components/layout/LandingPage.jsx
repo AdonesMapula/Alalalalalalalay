@@ -2,6 +2,7 @@ import React from 'react';
 import {
   ArrowRight,
   Shield,
+  ShieldCheck,
   Sparkles,
   CheckCircle2,
   Lock,
@@ -13,11 +14,16 @@ import {
   Star,
   ExternalLink,
   ChevronRight,
+  Users,
+  Coins,
 } from 'lucide-react';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { IOSButton } from '../common/IOSButton';
+import { useApp } from '../../context/AppContext';
 
 export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
+  const { t } = useApp();
+
   return (
     <div className="min-h-screen bg-[#FAFBFF] text-[#0f172a] select-none flex flex-col">
       {/* Top Header */}
@@ -27,9 +33,9 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
 
           {/* Navigation Links */}
           <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <a href="#features" className="hover:text-[#093a96] transition-colors">Features</a>
-            <a href="#how-it-works" className="hover:text-[#093a96] transition-colors">How it Works</a>
-            <a href="#trust-security" className="hover:text-[#093a96] transition-colors">Trust & Security</a>
+            <a href="#features" className="hover:text-[#093a96] transition-colors">{t('landing.nav.features')}</a>
+            <a href="#how-it-works" className="hover:text-[#093a96] transition-colors">{t('landing.nav.howItWorks')}</a>
+            <a href="#trust-security" className="hover:text-[#093a96] transition-colors">{t('landing.nav.trustSecurity')}</a>
           </nav>
 
           {/* Right Actions */}
@@ -39,7 +45,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
               onClick={onGetStarted}
               className="text-sm font-bold text-slate-700 hover:text-[#093a96] cursor-pointer"
             >
-              Log In
+              {t('landing.logIn')}
             </button>
             <IOSButton
               variant="primary"
@@ -47,7 +53,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
               onClick={onGetStarted}
               className="!px-5 !py-2 font-bold shadow-md shadow-blue-900/15"
             >
-              Get Started
+              {t('landing.getStarted')}
             </IOSButton>
           </div>
         </div>
@@ -60,23 +66,23 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
           <div className="lg:col-span-7 space-y-6">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200">
               <span className="w-2 h-2 rounded-full bg-[#093a96]" />
-              <span>Official Information Sources</span>
+              <span>{t('landing.badge.sources')}</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#0f172a] leading-[1.15]">
-              Government services made{' '}
-              <span className="text-[#093a96] underline decoration-blue-200 decoration-wavy decoration-2">
-                understandable
+              {t('landing.hero.made')}{' '}
+              <span className="text-[#093a96] underline ">
+                {t('landing.hero.understandable')}
               </span>{' '}
-              and{' '}
+              {t('landing.hero.and')}{' '}
               <span className="text-[#093a96]">
-                personalized
+                {t('landing.hero.personalized')}
               </span>
-              .
+              {t('landing.hero.suffix') ? ` ${t('landing.hero.suffix')}` : ''}.
             </h1>
 
             <p className="text-base sm:text-lg text-slate-600 max-w-xl leading-relaxed font-normal">
-              Navigate bureaucratic processes effortlessly. ALALAY uses AI to decode official requirements, match them to your unique profile, and guide you step-by-step.
+              {t('landing.hero.desc')}
             </p>
 
             {/* CTA Buttons */}
@@ -88,7 +94,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
                 onClick={onGetStarted}
                 className="!bg-[#093a96] hover:!bg-[#072d75] shadow-lg shadow-blue-900/20"
               >
-                Get Started Free
+                {t('landing.hero.ctaPrimary')}
               </IOSButton>
 
               <IOSButton
@@ -97,7 +103,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
                 onClick={onGetStarted}
                 className="!bg-slate-100 text-slate-700 hover:!bg-slate-200"
               >
-                View Demo
+                {t('landing.hero.ctaSecondary')}
               </IOSButton>
             </div>
 
@@ -130,7 +136,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
                   <Star className="w-3.5 h-3.5 fill-current" />
                 </div>
                 <p className="text-xs font-semibold text-slate-600 mt-0.5">
-                  Trusted by 10,000+ citizens
+                  {t('landing.hero.reviewsTrust')}
                 </p>
               </div>
             </div>
@@ -147,14 +153,14 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
                   </div>
                   <div>
                     <h3 className="text-sm sm:text-base font-bold text-[#0f172a]">
-                      Passport Renewal
+                      {t('landing.card.passportRenewal')}
                     </h3>
-                    <p className="text-xs text-slate-500">Personalized Guide</p>
+                    <p className="text-xs text-slate-500">{t('landing.card.personalizedGuide')}</p>
                   </div>
                 </div>
 
                 <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-[#093a96] text-[10px] font-black tracking-wider uppercase">
-                  READY
+                  {t('landing.card.ready')}
                 </span>
               </div>
 
@@ -164,7 +170,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
                   <div className="h-full bg-[#093a96] w-3/4 rounded-full" />
                 </div>
                 <p className="text-[11px] text-slate-600">
-                  3 of 4 documents verified. Next step: Schedule appointment.
+                  {t('landing.card.passportProgress')}
                 </p>
               </div>
             </div>
@@ -176,9 +182,9 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
                 <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#0f172a]">AI Match</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-[#0f172a]">{t('landing.card.aiMatch')}</h4>
                 <p className="text-[11px] text-slate-500 leading-snug">
-                  Tailored exactly to your profile.
+                  {t('landing.card.aiMatchDesc')}
                 </p>
               </div>
 
@@ -187,16 +193,16 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
                 <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
                   <Shield className="w-4 h-4" />
                 </div>
-                <h4 className="text-xs sm:text-sm font-bold text-[#0f172a]">Secure Vault</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-[#0f172a]">{t('landing.card.secureVault')}</h4>
                 <p className="text-[11px] text-slate-500 leading-snug">
-                  Data encrypted at rest.
+                  {t('landing.card.secureVaultDesc')}
                 </p>
 
                 {/* Floating pill badge in image */}
                 <div className="pt-2">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-[10px] font-medium border border-slate-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] animate-ping" />
-                    <span>Checking eligibility...</span>
+                    <span>{t('landing.card.checkingEligibility')}</span>
                   </span>
                 </div>
               </div>
@@ -209,7 +215,7 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
       <section className="border-y border-slate-200/80 bg-white py-8 px-6">
         <div className="max-w-7xl mx-auto text-center space-y-4">
           <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            VERIFIED INFORMATION SCRAPED FROM
+            {t('landing.verifiedFrom')}
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16 text-slate-700 font-bold text-sm">
@@ -237,10 +243,10 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
       <section id="how-it-works" className="py-20 px-6 sm:px-12 max-w-7xl mx-auto w-full text-center space-y-12">
         <div className="space-y-3 max-w-2xl mx-auto">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0f172a] tracking-tight">
-            How ALALAY Works
+            {t('landing.howItWorks.title')}
           </h2>
           <p className="text-sm text-slate-500 leading-relaxed">
-            We handle the complex bureaucratic parsing so you don't have to. Three simple steps to clarity.
+            {t('landing.howItWorks.subtitle')}
           </p>
         </div>
 
@@ -255,10 +261,10 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
             </div>
 
             <h3 className="text-lg font-bold text-[#0f172a] pt-2">
-              Automated Scraping
+              {t('landing.howItWorks.step1.title')}
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              We continuously scan official government portals to ensure our database reflects the most current requirements and forms.
+              {t('landing.howItWorks.step1.desc')}
             </p>
           </div>
 
@@ -272,10 +278,10 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
             </div>
 
             <h3 className="text-lg font-bold text-[#0f172a] pt-2">
-              AI Processing
+              {t('landing.howItWorks.step2.title')}
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Our legal-grade AI models digest dense bureaucratic jargon and translate it into plain, conversational language.
+              {t('landing.howItWorks.step2.desc')}
             </p>
           </div>
 
@@ -289,27 +295,89 @@ export const LandingPage = ({ onGetStarted, onLogin, onOpenAdmin }) => {
             </div>
 
             <h3 className="text-lg font-bold text-[#0f172a] pt-2">
-              Personalized Match
+              {t('landing.howItWorks.step3.title')}
             </h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Tell us a bit about your situation, and ALALAY filters the generic rules to show only the exact steps you personally need to take.
+              {t('landing.howItWorks.step3.desc')}
             </p>
           </div>
         </div>
+      </section>
+
+      {/* Trust & Security: Transparent Matching Methodology */}
+      <section id="trust-security" className="py-20 px-6 sm:px-12 max-w-7xl mx-auto w-full bg-slate-50/60">
+        <div className="text-center space-y-3 max-w-2xl mx-auto mb-12">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-slate-700 text-xs font-semibold border border-slate-200">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#093a96]" />
+            <span>{t('landing.trust.badge')}</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-[#0f172a] tracking-tight">
+            {t('landing.trust.title')}
+          </h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            {t('landing.trust.subtitle')}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-2 alalay-card-shadow">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-[#093a96] flex items-center justify-center">
+              <Users className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-[#0f172a]">{t('landing.trust.demographics.title')}</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              {t('landing.trust.demographics.desc')}
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-2 alalay-card-shadow">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <Coins className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-[#0f172a]">{t('landing.trust.economic.title')}</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              {t('landing.trust.economic.desc')}
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-2 alalay-card-shadow">
+            <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center">
+              <FileCheck className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-[#0f172a]">{t('landing.trust.documents.title')}</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              {t('landing.trust.documents.desc')}
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white border border-slate-200/80 space-y-2 alalay-card-shadow">
+            <div className="w-11 h-11 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+              <Building className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-[#0f172a]">{t('landing.trust.citizenship.title')}</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              {t('landing.trust.citizenship.desc')}
+            </p>
+          </div>
+        </div>
+
+        <p className="text-center text-xs text-slate-400 mt-8 max-w-xl mx-auto">
+          {t('landing.trust.footnote')}
+        </p>
       </section>
 
       {/* Footer */}
       <footer className="border-t border-slate-200 py-8 px-6 text-center text-xs text-slate-500 bg-white">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <AlalayLogo size="sm" />
-          <p>© 2026 ALALAY Philippines. All official information verified from approved government sources.</p>
+          <p>{t('landing.footer.copyright')}</p>
           {onOpenAdmin && (
             <button
               type="button"
               onClick={onOpenAdmin}
               className="text-xs font-semibold text-[#093a96] hover:underline cursor-pointer"
             >
-              Super Admin Portal →
+              {t('landing.footer.adminPortal')}
             </button>
           )}
         </div>

@@ -26,85 +26,21 @@ import {
   Maximize2,
   Award,
   AlertCircle,
+  UploadCloud,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSButton } from '../common/IOSButton';
 import { askAlalayAI } from '../../services/geminiService';
 import { matchOpportunityForCitizen, matchRequirementWithUserDoc } from '../../services/rulesEngine';
-import logoImg from '../../assets/logos.png';
+import logoImg from '../../assets/AIlogos.png';
+
+import { AiMessageRenderer } from '../common/AiMessageRenderer';
 
 /**
- * Message Formatter for Side AI Chat with Smooth Staggered Text Transitions
+ * Message Formatter for Side AI Chat with Card-Based Stepper & Interactive Deck
  */
-const SideAiMessageRenderer = ({ text, sourceUrl }) => {
-  if (!text) return null;
-  const lines = text.split('\n');
-
-  return (
-    <div className="space-y-2 text-xs leading-relaxed text-slate-800">
-      {lines.map((line, idx) => {
-        const raw = line.trim();
-        if (!raw) return null;
-
-        if (raw.startsWith('###') || raw.startsWith('##') || raw.endsWith(':')) {
-          return (
-            <div
-              key={idx}
-              style={{ animationDelay: `${idx * 45}ms` }}
-              className="animate-text-stagger font-bold text-[#093a96] text-xs pt-1 flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3 h-3 text-blue-600 flex-shrink-0" />
-              <span>{raw.replace(/^#+\s*/, '')}</span>
-            </div>
-          );
-        }
-
-        if (raw.startsWith('•') || raw.startsWith('-') || raw.startsWith('*')) {
-          return (
-            <div
-              key={idx}
-              style={{ animationDelay: `${idx * 45}ms` }}
-              className="animate-text-stagger flex items-start gap-1.5 pl-1.5 text-slate-700"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] mt-1.5 flex-shrink-0" />
-              <span>{raw.replace(/^[•\-\*]\s*/, '')}</span>
-            </div>
-          );
-        }
-
-        return (
-          <p
-            key={idx}
-            style={{ animationDelay: `${idx * 45}ms` }}
-            className="animate-text-stagger leading-relaxed"
-          >
-            {raw}
-          </p>
-        );
-      })}
-
-      {sourceUrl && (
-        <div
-          style={{ animationDelay: `${lines.length * 45}ms` }}
-          className="animate-text-stagger pt-2 mt-2 border-t border-blue-100/80 flex items-center justify-between text-[10px] text-slate-500"
-        >
-          <span className="flex items-center gap-1 font-semibold text-emerald-700">
-            <ShieldCheck className="w-3 h-3 text-emerald-600" />
-            <span>Charter Citation</span>
-          </span>
-          <a
-            href={sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[#093a96] font-bold hover:underline inline-flex items-center gap-0.5"
-          >
-            <span>{sourceUrl.replace(/^https?:\/\//, '').split('/')[0]}</span>
-            <ExternalLink className="w-2.5 h-2.5" />
-          </a>
-        </div>
-      )}
-    </div>
-  );
+const SideAiMessageRenderer = ({ text, sourceUrl, onUploadDocument }) => {
+  return <AiMessageRenderer text={text} sourceUrl={sourceUrl} onUploadDocument={onUploadDocument} size="sm" />;
 };
 
 export const OpportunityDetailModal = () => {
@@ -121,9 +57,8 @@ export const OpportunityDetailModal = () => {
     setActiveTab,
     setLoadedChatSession,
     addToast,
+    openUploadForRequirement,
   } = useApp();
-
-  const [manualChecks, setManualChecks] = useState({});
 
   // Side AI Chat State
   const [isSideChatOpen, setIsSideChatOpen] = useState(false);
@@ -164,7 +99,7 @@ export const OpportunityDetailModal = () => {
           {
             id: 'init_side',
             sender: 'ai',
-            text: `Hi ${user?.firstName || 'there'}! I am grounded in the official Citizen's Charter for **${opp.title}** (${opp.agency}). Ask me about eligibility, required documents, or step-by-step application instructions.`,
+            text: `Hi ${user?.firstName || 'there'}! I have the official guidelines for **${opp.title}** (${opp.agency}). Ask me about eligibility, required documents, or step-by-step application instructions.`,
             time: 'Just now',
             sourceUrl: opp.officialSource?.url || 'https://www.gov.ph',
           },
@@ -203,13 +138,6 @@ export const OpportunityDetailModal = () => {
           'Official program entitlement',
           'Direct government agency support',
         ];
-
-  const toggleCheck = (idx) => {
-    setManualChecks((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
-  };
 
   const handleSendSideMessage = async (textToSend) => {
     const text = textToSend || sideInput.trim();
@@ -275,7 +203,7 @@ export const OpportunityDetailModal = () => {
       const errMsg = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
-        text: 'ALALAY is grounded in verified Citizen Charters. Please check with your nearest government agency branch or hospital Malasakit Center desk.',
+        text: 'ALALAY uses verified official guidelines. Please check with your nearest government agency branch or hospital Malasakit Center desk.',
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       };
       setSideMessages((prev) => [...prev, errMsg]);
@@ -453,54 +381,25 @@ export const OpportunityDetailModal = () => {
               </div>
             </div>
 
-            {/* Matchmaking Algorithm Dimensions Breakdown Card */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-white border border-blue-100/90 shadow-sm space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-blue-100 text-[#093a96] flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </div>
-                  <div>
-                    <h3 className="text-xs sm:text-sm font-extrabold text-[#0f172a] uppercase tracking-wider">
-                      How Matchmaking Scoring Works
-                    </h3>
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Multi-factor deterministic evaluation across 4 statutory dimensions (0 - 100%):
-                    </p>
-                  </div>
+            {/* Calculated Match Score — full scoring methodology is published on the landing page */}
+            <div className="p-4 sm:p-5 rounded-3xl bg-white border border-blue-100/90 shadow-sm flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-blue-100 text-[#093a96] flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5" />
                 </div>
-
-                <span className="text-xs font-black text-[#093a96] bg-blue-50 px-3 py-1 rounded-full border border-blue-200 shadow-2xs">
-                  Calculated Score: {matchedOpp.matchScore || 90}%
-                </span>
-              </div>
-
-              {/* 4 Transparent Dimension Gauges */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🎯 Demographics</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.demographicScore || 35}/40 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">Age, Seniority (RA 9994), PWD, Solo Parent</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">💼 Economic Profile</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.economicScore || 20}/25 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">Employment, SSS credits, indigent classification</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">📁 Locker Fulfillment</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.documentScore || 15}/25 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">{matchedOpp.matchedDocCount || 0} of {matchedOpp.totalDocCount || 0} required docs in vault</p>
-                </div>
-
-                <div className="p-3 rounded-2xl bg-[#f8fafd] border border-slate-200/80 space-y-1">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">🇵🇭 Citizenship Mandate</div>
-                  <div className="text-sm font-black text-[#093a96]">{matchedOpp.scoreBreakdown?.citizenshipScore || 10}/10 pts</div>
-                  <p className="text-[10px] text-slate-500 font-medium leading-tight">Philippine statutory entitlement (RA 11032)</p>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-extrabold text-[#0f172a] uppercase tracking-wider">
+                    Calculated Match Score
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Based on your profile, documents, and this program's requirements.
+                  </p>
                 </div>
               </div>
+
+              <span className="text-sm font-black text-[#093a96] bg-blue-50 px-4 py-1.5 rounded-full border border-blue-200 shadow-2xs">
+                {matchedOpp.matchScore || 90}%
+              </span>
             </div>
 
             {/* Program Overview & Scraped Citizen Information */}
@@ -570,10 +469,9 @@ export const OpportunityDetailModal = () => {
                   <span>Document Locker & Requirements Checklist</span>
                 </h3>
                 <span className="text-xs font-semibold text-slate-500">
-                  {requirementsList.filter((req, i) => {
+                  {requirementsList.filter((req) => {
                     const reqText = typeof req === 'string' ? req : req.name;
-                    const isAuto = !!matchRequirementWithUserDoc(reqText, documents, user);
-                    return manualChecks[i] !== undefined ? manualChecks[i] : isAuto;
+                    return !!matchRequirementWithUserDoc(reqText, documents, user);
                   }).length} of {requirementsList.length} Ready
                 </span>
               </div>
@@ -582,17 +480,18 @@ export const OpportunityDetailModal = () => {
                 {requirementsList.map((req, idx) => {
                   const reqText = typeof req === 'string' ? req : req.name;
                   const matchedDoc = matchRequirementWithUserDoc(reqText, documents, user);
-                  const isAutoMatched = !!matchedDoc;
-                  const isChecked = manualChecks[idx] !== undefined ? manualChecks[idx] : isAutoMatched;
+                  const isChecked = !!matchedDoc;
 
                   return (
                     <div
                       key={idx}
-                      onClick={() => toggleCheck(idx)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-4 ${
+                      onClick={() => {
+                        if (!isChecked && openUploadForRequirement) openUploadForRequirement(reqText);
+                      }}
+                      className={`p-4 rounded-2xl border transition-all flex items-start justify-between gap-4 ${
                         isChecked
                           ? 'bg-emerald-50/40 border-emerald-200'
-                          : 'bg-white border-slate-200 hover:border-slate-300'
+                          : 'bg-white border-slate-200 hover:border-slate-300 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -621,8 +520,21 @@ export const OpportunityDetailModal = () => {
                               <span>Auto-Verified in Locker: {matchedDoc.name}</span>
                             </div>
                           ) : (
-                            <div className="text-[10px] text-slate-400 font-medium">
-                              Not found in Document Locker. Upload file or check manually.
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                Not found in Document Locker.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (openUploadForRequirement) openUploadForRequirement(reqText);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#093a96] text-[10px] font-bold transition-colors cursor-pointer"
+                              >
+                                <UploadCloud className="w-3 h-3" />
+                                <span>Upload Document</span>
+                              </button>
                             </div>
                           )}
                         </div>
@@ -807,8 +719,8 @@ export const OpportunityDetailModal = () => {
                     className={`animate-message-pop flex gap-2 ${isAi ? 'justify-start' : 'justify-end'}`}
                   >
                     {isAi && (
-                      <div className="w-6 h-6 rounded-full bg-[#093a96] text-white flex items-center justify-center flex-shrink-0 mt-1 shadow-2xs">
-                        <Bot className="w-3.5 h-3.5" />
+                      <div className="w-6 h-6 rounded-full bg-white border border-blue-200 p-0.5 flex items-center justify-center flex-shrink-0 mt-1 shadow-2xs">
+                        <img src={logoImg} alt="ALALAY AI" className="w-full h-full object-contain" />
                       </div>
                     )}
 
@@ -820,7 +732,7 @@ export const OpportunityDetailModal = () => {
                       }`}
                     >
                       {isAi ? (
-                        <SideAiMessageRenderer text={msg.text} sourceUrl={msg.sourceUrl} />
+                        <SideAiMessageRenderer text={msg.text} sourceUrl={msg.sourceUrl} onUploadDocument={openUploadForRequirement} />
                       ) : (
                         <p className="text-xs leading-relaxed">{msg.text}</p>
                       )}
@@ -839,8 +751,8 @@ export const OpportunityDetailModal = () => {
 
               {isSideTyping && (
                 <div className="flex gap-2 justify-start items-center">
-                  <div className="w-6 h-6 rounded-full bg-[#093a96] text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
-                    <Bot className="w-3.5 h-3.5" />
+                  <div className="w-6 h-6 rounded-full bg-white border border-blue-200 p-0.5 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                    <img src={logoImg} alt="ALALAY AI" className="w-full h-full object-contain animate-bounce" />
                   </div>
                   <div className="p-3 rounded-2xl bg-white border border-slate-200 text-slate-500 shadow-2xs flex items-center gap-1.5 text-xs font-semibold">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] animate-bounce" />

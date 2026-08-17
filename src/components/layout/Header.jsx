@@ -10,6 +10,7 @@ export const Header = () => {
     activeTab,
     setActiveTab,
     unreadCount,
+    t,
   } = useApp();
 
   return (
@@ -17,10 +18,10 @@ export const Header = () => {
       {/* Greeting Title matching Image 3 */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-[#0f172a] tracking-tight">
-          Good afternoon, <span className="text-[#093a96]">{user.firstName}</span>
+          {t('header.greeting')}, <span className="text-[#093a96]">{user.firstName}</span>
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 font-normal mt-0.5">
-          Here are your personalized government service updates.
+          {t('header.subtitle')}
         </p>
       </div>
 

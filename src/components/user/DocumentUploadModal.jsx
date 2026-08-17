@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   UploadCloud,
   FileText,
@@ -8,13 +8,29 @@ import {
   Lock,
   X,
   Camera,
+  Sparkles,
+  ShieldCheck,
+  Zap,
+  RefreshCw,
+  Eye,
+  Check,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { IOSSheet } from '../common/IOSSheet';
 import { IOSButton } from '../common/IOSButton';
+import { scanAndExtractDocumentMetadata, OCR_PRESET_TEMPLATES } from '../../services/docAgentService';
 
 export const DocumentUploadModal = () => {
-  const { uploadModalOpen, setUploadModalOpen, uploadNewDocument } = useApp();
+  const {
+    uploadModalOpen,
+    setUploadModalOpen,
+    uploadModalPrefill,
+    setUploadModalPrefill,
+    uploadNewDocument,
+    user,
+    setUser,
+    addToast,
+  } = useApp();
 
   const [docName, setDocName] = useState('');
   const [docType, setDocType] = useState('National ID / Gov ID');
@@ -22,27 +38,65 @@ export const DocumentUploadModal = () => {
   const [docNumber, setDocNumber] = useState('');
   const [expirationDate, setExpirationDate] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
+  const [isScanningOcr, setIsScanningOcr] = useState(false);
+  const [ocrResult, setOcrResult] = useState(null);
+  const [syncToProfile, setSyncToProfile] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Pre-fill the form when opened from a specific missing requirement (e.g. from a
+  // checklist in chat or on the opportunity page), so the citizen doesn't have to
+  // re-select the document type manually. Consumed immediately (cleared right after
+  // applying) so it can never linger and overwrite a later OCR preset/scan result.
+  useEffect(() => {
+    if (uploadModalOpen && uploadModalPrefill) {
+      setDocName(uploadModalPrefill.name || '');
+      setDocType(uploadModalPrefill.type || 'National ID / Gov ID');
+      setUploadModalPrefill(null);
+    }
+  }, [uploadModalOpen, uploadModalPrefill, setUploadModalPrefill]);
+
   const documentTypes = [
     'National ID / Gov ID',
+    'Barangay Certificate',
     'PhilHealth MDR',
     'NBI Clearance',
     'Police Clearance',
-    'Barangay Certificate',
     'Birth Certificate (PSA)',
-    'Certificate of Employment (COE)',
     'Medical Certificate / Clinical Abstract',
+    'Certificate of Employment (COE)',
     'School Registration / Transcript',
   ];
+
+  // Process Document with DocAgent OCR
+  const handleProcessFileWithDocAgent = async (fileOrName) => {
+    setIsScanningOcr(true);
+    try {
+      const extracted = await scanAndExtractDocumentMetadata(fileOrName);
+      setOcrResult(extracted);
+      setDocName(extracted.name);
+      setDocType(extracted.type);
+      setIssuer(extracted.issuer);
+      setDocNumber(extracted.documentNumber);
+      setExpirationDate(extracted.expirationDate);
+      addToast(
+        'DocAgent OCR Complete',
+        `Extracted ${extracted.name} (${extracted.confidenceScore}% confidence score).`,
+        'success'
+      );
+    } catch (err) {
+      console.warn('DocAgent OCR Error:', err);
+    } finally {
+      setIsScanningOcr(false);
+    }
+  };
 
   const handleFileDrop = (e) => {
     e.preventDefault();
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       setSelectedFile(file);
-      if (!docName) setDocName(file.name.replace(/\.[^/.]+$/, ''));
+      handleProcessFileWithDocAgent(file);
     }
   };
 
@@ -50,7 +104,15 @@ export const DocumentUploadModal = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      if (!docName) setDocName(file.name.replace(/\.[^/.]+$/, ''));
+      handleProcessFileWithDocAgent(file);
+    }
+  };
+
+  // Quick Preset Selector for Fast Testing
+  const handleSelectPreset = (presetKey) => {
+    const preset = OCR_PRESET_TEMPLATES[presetKey];
+    if (preset) {
+      handleProcessFileWithDocAgent(preset.name);
     }
   };
 
@@ -59,39 +121,95 @@ export const DocumentUploadModal = () => {
     if (!docName) return;
 
     setIsUploading(true);
-    setUploadProgress(20);
+    setUploadProgress(30);
 
-    setTimeout(() => setUploadProgress(60), 400);
-    setTimeout(() => setUploadProgress(100), 800);
+    setTimeout(() => setUploadProgress(70), 300);
+    setTimeout(() => setUploadProgress(100), 600);
 
     setTimeout(() => {
-      uploadNewDocument({
-        name: docName,
-        type: docType,
-        issuer: issuer || 'Authorized Government Issuer',
-        documentNumber: docNumber || `DOC-${Math.floor(100000 + Math.random() * 900000)}`,
-        expirationDate: expirationDate || '2028-12-31',
-      });
+      // 1. Upload to Document Vault
+      if (uploadNewDocument) {
+        uploadNewDocument({
+          name: docName,
+          type: docType,
+          issuer: issuer || 'Authorized Government Agency',
+          documentNumber: docNumber || `DOC-${Math.floor(100000 + Math.random() * 900000)}`,
+          expirationDate: expirationDate || '2028-12-31',
+          thumbnail: ocrResult?.thumbnail || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+          attributes: ocrResult?.attributes || {},
+        });
+      }
+
+      // 2. Auto-sync extracted attributes to User Profile
+      if (syncToProfile && ocrResult?.attributes && user && setUser) {
+        const updatedUser = { ...user };
+        const attrs = ocrResult.attributes;
+
+        if (attrs.crn) updatedUser.egovId = attrs.crn;
+        if (attrs.nbiId) updatedUser.nbiClearanceNo = attrs.nbiId;
+        if (attrs.certificateNumber) updatedUser.barangayIndigencyNo = attrs.certificateNumber;
+
+        setUser(updatedUser);
+        localStorage.setItem('alalay_user', JSON.stringify(updatedUser));
+        addToast('Profile Auto-Updated', 'Synced extracted government IDs to citizen profile.', 'info');
+      }
+
       setIsUploading(false);
       setDocName('');
       setSelectedFile(null);
-    }, 1100);
+      setOcrResult(null);
+      setUploadModalOpen(false);
+      if (setUploadModalPrefill) setUploadModalPrefill(null);
+    }, 900);
   };
 
   return (
     <IOSSheet
       isOpen={uploadModalOpen}
-      onClose={() => setUploadModalOpen(false)}
-      title="Upload Government Document"
-      subtitle="Encrypted & Scanned for Eligibility Verification"
+      onClose={() => {
+        setUploadModalOpen(false);
+        setOcrResult(null);
+        if (setUploadModalPrefill) setUploadModalPrefill(null);
+      }}
+      title="DocAgent Document Vault"
+      subtitle="Autonomous OCR, Attribute Extraction & Vault Sync"
       maxWidth="max-w-xl"
     >
       <form onSubmit={handleSubmit} className="space-y-4 select-none">
+        {/* Quick Simulation Presets */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <span className="flex items-center gap-1 text-[#093a96]">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>DocAgent Quick OCR Presets:</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-normal">Click to auto-scan</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            {[
+              { key: 'philsys', label: '🇵🇭 PhilSys ID', color: 'bg-blue-50 hover:bg-blue-100/80 border-blue-200 text-[#093a96]' },
+              { key: 'pwd_id', label: '♿ PWD ID', color: 'bg-indigo-50 hover:bg-indigo-100/80 border-indigo-200 text-indigo-900' },
+              { key: 'indigency', label: '📜 Brgy. Indigency', color: 'bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-900' },
+              { key: 'philhealth_mdr', label: '💊 PhilHealth MDR', color: 'bg-rose-50 hover:bg-rose-100/80 border-rose-200 text-rose-900' },
+            ].map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                onClick={() => handleSelectPreset(preset.key)}
+                className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold transition-all text-left truncate cursor-pointer shadow-2xs ${preset.color}`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Upload Drop Zone */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleFileDrop}
-          className="border-2 border-dashed border-slate-300 hover:border-[#007AFF] rounded-3xl p-6 text-center bg-slate-50/70 hover:bg-blue-50/30 ios-spring cursor-pointer relative"
+          className="border-2 border-dashed border-blue-200 hover:border-[#093a96] rounded-3xl p-5 text-center bg-blue-50/30 hover:bg-blue-50/60 transition-all cursor-pointer relative"
         >
           <input
             type="file"
@@ -101,40 +219,93 @@ export const DocumentUploadModal = () => {
           />
 
           <div className="flex flex-col items-center justify-center space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-[#007AFF] flex items-center justify-center shadow-inner">
-              <UploadCloud className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-2xl bg-white border border-blue-200 text-[#093a96] flex items-center justify-center shadow-xs">
+              {isScanningOcr ? (
+                <RefreshCw className="w-5 h-5 animate-spin text-[#093a96]" />
+              ) : (
+                <UploadCloud className="w-5 h-5" />
+              )}
             </div>
 
-            {selectedFile ? (
+            {isScanningOcr ? (
+              <div className="space-y-0.5">
+                <p className="text-xs font-bold text-[#093a96] flex items-center gap-1.5 justify-center">
+                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                  <span>DocAgent AI is analyzing document structure & OCR...</span>
+                </p>
+                <p className="text-[10px] text-slate-400">Extracting CRN, issuing seal, and validity period</p>
+              </div>
+            ) : selectedFile ? (
               <div className="text-center">
-                <p className="text-xs font-bold text-[#007AFF]">{selectedFile.name}</p>
+                <p className="text-xs font-bold text-[#093a96]">{selectedFile.name}</p>
                 <p className="text-[10px] text-slate-500">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready to process
+                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready for vault encryption
                 </p>
               </div>
             ) : (
               <div>
-                <p className="text-xs sm:text-sm font-bold text-[#1C1C1E]">
-                  Drag and drop file here, or browse
+                <p className="text-xs sm:text-sm font-bold text-slate-800">
+                  Drop government PDF or image here, or browse
                 </p>
-                <p className="text-[11px] text-[#8E8E93] mt-0.5">
-                  Supports PDF, PNG, JPEG up to 15MB
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  DocAgent automatically extracts ID numbers & statutory validity
                 </p>
               </div>
             )}
           </div>
         </div>
 
+        {/* OCR Result Preview Card */}
+        {ocrResult && (
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/90 to-indigo-50/60 border border-blue-200/80 space-y-2 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#093a96]">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>DocAgent Extraction Verified</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300">
+                {ocrResult.confidenceScore}% Confidence
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700 font-medium">
+              <div className="p-2 rounded-xl bg-white border border-blue-100">
+                <span className="text-[10px] text-slate-400 block font-bold">Extracted ID No:</span>
+                <span className="font-mono text-[#093a96] font-bold truncate block">
+                  {ocrResult.documentNumber}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-white border border-blue-100">
+                <span className="text-[10px] text-slate-400 block font-bold">Statutory Expiration:</span>
+                <span className="text-slate-800 font-bold block truncate">
+                  {ocrResult.expirationDate}
+                </span>
+              </div>
+            </div>
+
+            {/* Profile Auto-Sync Checkbox */}
+            <label className="flex items-center gap-2 pt-1 text-[11px] font-bold text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={syncToProfile}
+                onChange={(e) => setSyncToProfile(e.target.checked)}
+                className="w-3.5 h-3.5 text-[#093a96] rounded accent-[#093a96]"
+              />
+              <span>Auto-sync extracted credentials to Citizen Profile</span>
+            </label>
+          </div>
+        )}
+
         {/* Progress Bar when uploading */}
         {isUploading && (
           <div className="space-y-1.5 p-3 rounded-2xl bg-blue-50 border border-blue-100">
             <div className="flex items-center justify-between text-xs font-semibold text-blue-900">
-              <span>Scanning document metadata...</span>
+              <span>Encrypting & syncing to vault...</span>
               <span>{uploadProgress}%</span>
             </div>
             <div className="w-full h-1.5 bg-blue-200 rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#007AFF] ios-spring"
+                className="h-full bg-[#093a96] transition-all"
                 style={{ width: `${uploadProgress}%` }}
               />
             </div>
@@ -144,7 +315,7 @@ export const DocumentUploadModal = () => {
         {/* Form Inputs */}
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold text-[#1C1C1E] mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               Document Name
             </label>
             <input
@@ -152,96 +323,97 @@ export const DocumentUploadModal = () => {
               required
               value={docName}
               onChange={(e) => setDocName(e.target.value)}
-              placeholder="e.g. Updated NBI Clearance 2026"
-              className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 py-2 text-xs sm:text-sm outline-none focus:border-[#007AFF]"
+              placeholder="e.g. Barangay Certificate of Indigency"
+              className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:border-[#093a96] focus:bg-white outline-none transition-all"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[#1C1C1E] mb-1">
-                Document Type
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Document Category
               </label>
               <select
                 value={docType}
                 onChange={(e) => setDocType(e.target.value)}
-                className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3 py-2 text-xs sm:text-sm outline-none focus:border-[#007AFF]"
+                className="w-full px-3 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:border-[#093a96] focus:bg-white outline-none transition-all cursor-pointer"
               >
-                {documentTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {documentTypes.map((type, idx) => (
+                  <option key={idx} value={type}>
+                    {type}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#1C1C1E] mb-1">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
                 Issuing Agency / Office
               </label>
               <input
                 type="text"
                 value={issuer}
                 onChange={(e) => setIssuer(e.target.value)}
-                placeholder="e.g. NBI UN Avenue Main Office"
-                className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 py-2 text-xs sm:text-sm outline-none focus:border-[#007AFF]"
+                placeholder="e.g. Barangay Hall / PSA / NBI"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:border-[#093a96] focus:bg-white outline-none transition-all"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[#1C1C1E] mb-1">
-                Document / Reference Number
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Document / Registry Number
               </label>
               <input
                 type="text"
                 value={docNumber}
                 onChange={(e) => setDocNumber(e.target.value)}
-                placeholder="e.g. NBI-2026-88190"
-                className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 py-2 text-xs sm:text-sm outline-none focus:border-[#007AFF]"
+                placeholder="e.g. PH-CRN-9942-8810-7214"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-mono font-medium focus:border-[#093a96] focus:bg-white outline-none transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[#1C1C1E] mb-1">
-                Expiration Date (if applicable)
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Expiration / Validity Date
               </label>
               <input
                 type="date"
                 value={expirationDate}
                 onChange={(e) => setExpirationDate(e.target.value)}
-                className="w-full bg-white border border-[#E5E5EA] rounded-xl px-3.5 py-2 text-xs sm:text-sm outline-none focus:border-[#007AFF]"
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-medium focus:border-[#093a96] focus:bg-white outline-none transition-all cursor-pointer"
               />
             </div>
           </div>
         </div>
 
-        {/* Security Note */}
-        <div className="p-3 rounded-2xl bg-slate-100 border border-slate-200 text-[11px] text-slate-600 flex items-center gap-2">
-          <Lock className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-          <span>Protected with AES-256 client encryption & Supabase Row Level Security.</span>
-        </div>
+        {/* Security & Action Buttons */}
+        <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold">
+            <Lock className="w-3.5 h-3.5 text-emerald-600" />
+            <span>AES-256 Encrypted in Citizen Vault</span>
+          </div>
 
-        {/* Submit Buttons */}
-        <div className="flex gap-3 pt-2">
-          <IOSButton
-            variant="secondary"
-            size="md"
-            onClick={() => setUploadModalOpen(false)}
-          >
-            Cancel
-          </IOSButton>
-          <IOSButton
-            type="submit"
-            variant="primary"
-            size="md"
-            fullWidth
-            loading={isUploading}
-            disabled={!docName || isUploading}
-          >
-            Save & Index Document
-          </IOSButton>
+          <div className="flex items-center gap-2">
+            <IOSButton
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => setUploadModalOpen(false)}
+            >
+              Cancel
+            </IOSButton>
+
+            <IOSButton
+              variant="primary"
+              size="md"
+              type="submit"
+              disabled={isUploading || !docName}
+            >
+              Save to Vault
+            </IOSButton>
+          </div>
         </div>
       </form>
     </IOSSheet>

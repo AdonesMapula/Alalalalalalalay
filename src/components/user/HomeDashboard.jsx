@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Sparkles,
   Search,
@@ -12,6 +12,7 @@ import {
   Briefcase,
   Plane,
   ChevronRight,
+  ChevronDown,
   Bot,
   User,
   ExternalLink,
@@ -20,11 +21,17 @@ import {
   Zap,
   Calendar,
   Award,
+  X,
+  History,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { IOSButton } from '../common/IOSButton';
-import { rankAndFilterOpportunities, calculateCitizenAge } from '../../services/rulesEngine';
+import {
+  rankAndFilterOpportunities,
+  calculateCitizenAge,
+  MINIMUM_DISPLAY_MATCH_SCORE,
+} from '../../services/rulesEngine';
 
 export const HomeDashboard = () => {
   const {
@@ -35,6 +42,11 @@ export const HomeDashboard = () => {
     openAskAlalay,
     user,
     documents,
+    autoApplyQueue,
+    submitAutoApply,
+    dismissAutoApply,
+    clearAutoApplyHistory,
+    t,
   } = useApp();
 
   const userAge = calculateCitizenAge(user);
@@ -45,12 +57,36 @@ export const HomeDashboard = () => {
     return rankAndFilterOpportunities(opportunities, user, documents);
   }, [opportunities, user, documents]);
 
+  const pendingAutoApplyEntries = useMemo(() => {
+    return (autoApplyQueue || [])
+      .filter((entry) => entry.status === 'ready_to_submit')
+      .map((entry) => ({ ...entry, opp: rankedOpportunities.find((o) => o.id === entry.oppId) }))
+      .filter((entry) => entry.opp);
+  }, [autoApplyQueue, rankedOpportunities]);
+
+  // Persisted history of everything Auto-Apply has actually submitted (survives refresh,
+  // unlike the toast notification shown at the moment of submission).
+  const appliedAutoApplyEntries = useMemo(() => {
+    return (autoApplyQueue || [])
+      .filter((entry) => entry.status === 'applied')
+      .map((entry) => ({ ...entry, opp: rankedOpportunities.find((o) => o.id === entry.oppId) }))
+      .filter((entry) => entry.opp)
+      .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
+  }, [autoApplyQueue, rankedOpportunities]);
+
+  const [showApplyHistory, setShowApplyHistory] = useState(false);
+
+  const visibleOpportunities = useMemo(
+    () => rankedOpportunities.filter((opp) => (opp.matchScore || 0) >= MINIMUM_DISPLAY_MATCH_SCORE),
+    [rankedOpportunities]
+  );
+
   const categoryChips = [
-    { id: 'health', name: 'Health & Medical', icon: HeartPulse },
-    { id: 'education', name: 'Education & Loans', icon: GraduationCap },
-    { id: 'finance', name: 'Finance & Grants', icon: Coins },
-    { id: 'social', name: 'Social Welfare', icon: Shield },
-    { id: 'employment', name: 'Employment & Labor', icon: Briefcase },
+    { id: 'health', name: t('home.categoryChip.health'), icon: HeartPulse },
+    { id: 'education', name: t('home.categoryChip.education'), icon: GraduationCap },
+    { id: 'finance', name: t('home.categoryChip.finance'), icon: Coins },
+    { id: 'social', name: t('home.categoryChip.social'), icon: Shield },
+    { id: 'employment', name: t('home.categoryChip.employment'), icon: Briefcase },
   ];
 
   const topColors = ['#22c55e', '#093a96', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'];
@@ -64,32 +100,30 @@ export const HomeDashboard = () => {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-[#093a96] text-xs font-bold border border-blue-200 shadow-2xs">
               <Bot className="w-3.5 h-3.5" />
-              <span>AI Assistant</span>
+              <span>{t('home.aiAssistant')}</span>
             </div>
 
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{opportunities?.length || 0} Live Ingested Services</span>
+              <span>{opportunities?.length || 0} {t('home.liveServices')}</span>
             </div>
 
             {isSenior && (
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300">
                 <Award className="w-3.5 h-3.5 text-amber-700" />
-                <span>Senior Citizen Mode ({userAge} yrs)</span>
+                <span>{t('home.seniorMode')} ({userAge} yrs)</span>
               </div>
             )}
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0f172a] tracking-tight leading-snug">
             {isSenior
-              ? `Senior Citizen Benefits & Prioritized Care for ${user?.firstName || 'Citizen'}.`
-              : 'Let ALALAY find services you qualify for.'}
+              ? `${t('home.heroTitleSenior')} ${user?.firstName || 'Citizen'}.`
+              : t('home.heroTitleDefault')}
           </h2>
 
           <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
-            {isSenior
-              ? `We automatically match your profile with OSCA Social Pensions, Expanded Senior Citizen discounts (RA 9994), PhilHealth Point-of-Service, and maintenance medicine programs.`
-              : 'We continuously monitor government portals to match you with hospitalization assistance, student loans, tuition subsidies, and citizen benefits.'}
+            {isSenior ? t('home.heroDescSenior') : t('home.heroDescDefault')}
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -100,7 +134,7 @@ export const HomeDashboard = () => {
               onClick={() => openAskAlalay()}
               className="!bg-[#093a96] hover:!bg-[#072d75] font-bold shadow-md shadow-blue-900/20"
             >
-              Ask ALALAY Scan
+              {t('home.askScan')}
             </IOSButton>
 
             <button
@@ -108,7 +142,7 @@ export const HomeDashboard = () => {
               onClick={() => setActiveTab('explore')}
               className="px-5 py-2.5 rounded-full bg-white text-[#0f172a] text-sm font-semibold border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer inline-flex items-center gap-1.5"
             >
-              <span>Explore All ({opportunities?.length || 0})</span>
+              <span>{t('home.exploreAll')} ({visibleOpportunities.length})</span>
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </button>
           </div>
@@ -129,10 +163,10 @@ export const HomeDashboard = () => {
             </div>
             <div>
               <h4 className="text-xs font-bold text-amber-950">
-                Senior Citizen Entitlements Active (Age {userAge})
+                {t('home.seniorBannerTitle')} (Age {userAge})
               </h4>
               <p className="text-[11px] text-amber-800">
-                Grounded on Republic Act 9994 (Expanded Senior Citizens Act) & RA 10645 (Mandatory PhilHealth Coverage).
+                {t('home.seniorBannerDesc')}
               </p>
             </div>
           </div>
@@ -141,8 +175,151 @@ export const HomeDashboard = () => {
             onClick={() => setActiveTab('explore')}
             className="px-3.5 py-1.5 rounded-full bg-white text-amber-950 border border-amber-300 text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
           >
-            View Senior Programs →
+            {t('home.viewSeniorPrograms')}
           </button>
+        </div>
+      )}
+
+      {/* Auto-Apply Queue: 95%+ Likely Eligible matches ALALAY prepared and is waiting on you to submit */}
+      {pendingAutoApplyEntries.length > 0 && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-orange-50/80 border border-orange-200/90 space-y-3 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-orange-200/80 text-orange-900 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-bold text-orange-950">
+                {t('home.autoApply.readyTitle')} ({pendingAutoApplyEntries.length})
+              </h4>
+              <p className="text-[11px] text-orange-800">
+                {t('home.autoApply.readyDesc')}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {pendingAutoApplyEntries.map((entry) => (
+              <div
+                key={entry.oppId}
+                className="p-3 rounded-xl bg-white border border-orange-200/80 flex items-center justify-between gap-3 flex-wrap"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#1C1C1E] truncate">{entry.opp.title}</p>
+                  <p className="text-[10px] text-slate-500 truncate">{entry.opp.agency || 'Government Service'} • {entry.opp.matchScore}% Likely Eligible</p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOpportunity(entry.opp)}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    {t('home.autoApply.review')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = entry.opp.officialSource?.url;
+                      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                      submitAutoApply(entry.oppId);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#093a96] hover:bg-[#072d75] text-white text-[10px] font-bold transition-colors cursor-pointer"
+                  >
+                    {t('home.autoApply.submit')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dismissAutoApply(entry.oppId)}
+                    aria-label="Dismiss"
+                    className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Auto-Apply History: everything already submitted, persists across refresh */}
+      {appliedAutoApplyEntries.length > 0 && (
+        <div className="rounded-2xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden">
+          <div className="w-full p-4 sm:p-5 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setShowApplyHistory((prev) => !prev)}
+              className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#093a96] flex items-center justify-center flex-shrink-0">
+                <History className="w-5 h-5" />
+              </div>
+              <div className="text-left min-w-0">
+                <h4 className="text-xs sm:text-sm font-bold text-[#0f172a]">
+                  {t('home.autoApply.historyTitle')} ({appliedAutoApplyEntries.length})
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  {t('home.autoApply.historyDesc')}
+                </p>
+              </div>
+            </button>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => clearAutoApplyHistory()}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 text-[10px] font-bold transition-colors cursor-pointer"
+              >
+                {t('home.autoApply.clearAll')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowApplyHistory((prev) => !prev)}
+                aria-label={showApplyHistory ? 'Collapse history' : 'Expand history'}
+                className="cursor-pointer"
+              >
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showApplyHistory ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
+          </div>
+
+          {showApplyHistory && (
+            <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2">
+              {appliedAutoApplyEntries.map((entry) => (
+                <div
+                  key={entry.oppId}
+                  onClick={() => setSelectedOpportunity(entry.opp)}
+                  className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-blue-300 flex items-center justify-between gap-3 flex-wrap cursor-pointer transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#1C1C1E] truncate">{entry.opp.title}</p>
+                    <p className="text-[10px] text-slate-500 truncate">
+                      {entry.opp.agency || 'Government Service'} • Applied{' '}
+                      {entry.appliedAt
+                        ? new Date(entry.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : 'recently'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>{t('home.autoApply.applied')}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissAutoApply(entry.oppId);
+                      }}
+                      aria-label="Remove from history"
+                      className="w-6 h-6 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-600 text-slate-400 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -150,14 +327,14 @@ export const HomeDashboard = () => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Explore Categories
+            {t('home.categories.title')}
           </h3>
           <button
             type="button"
             onClick={() => setActiveTab('explore')}
             className="text-xs font-bold text-[#093a96] hover:underline cursor-pointer"
           >
-            See All
+            {t('home.categories.seeAll')}
           </button>
         </div>
 
@@ -189,10 +366,10 @@ export const HomeDashboard = () => {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-extrabold text-[#0f172a] tracking-tight">
-              {isSenior ? 'Recommended for Senior Citizens' : 'Recommended for You'}
+              {isSenior ? t('home.recommended.titleSenior') : t('home.recommended.titleDefault')}
             </h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Intelligently matched and ranked based on your verified credentials, age ({userAge} yrs), citizenship, and Document Locker
+              {t('home.recommended.subtitle')}
             </p>
           </div>
 
@@ -201,12 +378,12 @@ export const HomeDashboard = () => {
             onClick={() => setActiveTab('explore')}
             className="text-xs font-bold text-[#093a96] hover:underline cursor-pointer"
           >
-            Browse All ({rankedOpportunities.length})
+            {t('home.recommended.browseAll')} ({visibleOpportunities.length})
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {rankedOpportunities.map((opp, idx) => {
+          {visibleOpportunities.map((opp, idx) => {
             const topColor = opp.isSeniorPriority ? '#f59e0b' : topColors[idx % topColors.length];
             const IconComp = iconsList[idx % iconsList.length];
             const rawUrl = opp.officialSource?.url || '';
@@ -236,7 +413,7 @@ export const HomeDashboard = () => {
                           : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       }`}
                     >
-                      {opp.matchScore || 92}% Match
+                      {opp.matchScore || 92}% {t('common.match')}
                     </span>
 
                     {opp.matchBadge && (

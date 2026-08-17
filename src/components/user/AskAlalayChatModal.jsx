@@ -17,10 +17,12 @@ import {
   ArrowUpRight,
   Compass,
   Maximize2,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { askAlalayAI } from '../../services/geminiService';
-import logoImg from '../../assets/logos.png';
+import logoImg from '../../assets/AIlogos.png';
 
 /**
  * Intelligent Opportunity Matcher from AI Text & Database
@@ -122,235 +124,21 @@ function findMatchingOpportunities(aiText = '', allOpportunities = []) {
   return matched.slice(0, 4);
 }
 
+import { AiMessageRenderer } from '../common/AiMessageRenderer';
+
 /**
- * Message Content Formatter: parses plain text into rich visual cards, tables, checklists, and source badges
+ * Message Content Formatter: uses AiMessageRenderer for rich step cards and visual components
  */
-const FormattedAiMessage = ({ text, sourceUrl, matchedOpportunities = [], onOpenOpportunity }) => {
-  if (!text) return null;
-
-  const lines = text.split('\n');
-  const blocks = [];
-  let currentBullets = [];
-  let currentSteps = [];
-
-  const flushBullets = () => {
-    if (currentBullets.length > 0) {
-      blocks.push({
-        type: 'bullets',
-        items: [...currentBullets],
-      });
-      currentBullets = [];
-    }
-  };
-
-  const flushSteps = () => {
-    if (currentSteps.length > 0) {
-      blocks.push({
-        type: 'steps',
-        items: [...currentSteps],
-      });
-      currentSteps = [];
-    }
-  };
-
-  for (let i = 0; i < lines.length; i++) {
-    const rawLine = lines[i].trim();
-    if (!rawLine) {
-      flushBullets();
-      flushSteps();
-      continue;
-    }
-
-    // Bullet point lines
-    if (rawLine.startsWith('•') || rawLine.startsWith('-') || rawLine.startsWith('*')) {
-      flushSteps();
-      const content = rawLine.replace(/^[•\-\*]\s*/, '');
-      currentBullets.push(content);
-      continue;
-    }
-
-    // Numbered step lines (e.g. 1., 2.)
-    const stepMatch = rawLine.match(/^(\d+)\.\s*(.*)/);
-    if (stepMatch) {
-      flushBullets();
-      currentSteps.push({
-        number: stepMatch[1],
-        content: stepMatch[2],
-      });
-      continue;
-    }
-
-    // Regular heading or paragraph
-    flushBullets();
-    flushSteps();
-
-    if (rawLine.toLowerCase().includes('verified source:') || rawLine.toLowerCase().includes('source:')) {
-      blocks.push({
-        type: 'source',
-        content: rawLine,
-      });
-    } else if (rawLine.endsWith(':') || rawLine.includes('###') || rawLine.includes('##')) {
-      blocks.push({
-        type: 'heading',
-        content: rawLine.replace(/^#+\s*/, ''),
-      });
-    } else {
-      blocks.push({
-        type: 'paragraph',
-        content: rawLine,
-      });
-    }
-  }
-
-  flushBullets();
-  flushSteps();
-
+const FormattedAiMessage = ({ text, sourceUrl, matchedOpportunities = [], onOpenOpportunity, onUploadDocument }) => {
   return (
-    <div className="space-y-3 text-xs leading-relaxed text-slate-800">
-      {blocks.map((block, idx) => {
-        if (block.type === 'heading') {
-          return (
-            <div key={idx} className="font-extrabold text-[#093a96] text-xs pt-1 border-b border-blue-100 pb-1 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-              <span>{block.content}</span>
-            </div>
-          );
-        }
-
-        if (block.type === 'bullets') {
-          return (
-            <div key={idx} className="space-y-1.5 pt-0.5">
-              {block.items.map((item, bIdx) => {
-                const isMet = item.includes('✓') || item.toLowerCase().includes('verified');
-                const isAction = item.includes('✗') || item.toLowerCase().includes('action') || item.toLowerCase().includes('missing');
-                const hasMoney = item.includes('₱');
-
-                return (
-                  <div
-                    key={bIdx}
-                    className={`p-2.5 rounded-xl border flex items-start gap-2 text-[11px] ${
-                      isMet
-                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950'
-                        : isAction
-                        ? 'bg-amber-50/70 border-amber-200 text-amber-950'
-                        : hasMoney
-                        ? 'bg-blue-50/60 border-blue-200 text-blue-950 font-medium'
-                        : 'bg-slate-50 border-slate-200 text-slate-800'
-                    }`}
-                  >
-                    {isMet ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    ) : isAction ? (
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    ) : (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#093a96] flex-shrink-0 mt-1.5" />
-                    )}
-                    <span className="leading-snug">{item}</span>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        }
-
-        if (block.type === 'steps') {
-          return (
-            <div key={idx} className="space-y-2 pt-1">
-              {block.items.map((step, sIdx) => (
-                <div
-                  key={sIdx}
-                  className="p-3 rounded-2xl bg-white border border-blue-100 shadow-2xs flex items-start gap-2.5"
-                >
-                  <div className="w-5 h-5 rounded-full bg-[#093a96] text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0 mt-0.5">
-                    {step.number}
-                  </div>
-                  <div className="text-[11px] leading-relaxed text-slate-800">
-                    {step.content}
-                  </div>
-                </div>
-              ))}
-            </div>
-          );
-        }
-
-        if (block.type === 'source') {
-          const matchUrl = block.content.match(/(https?:\/\/[^\s\)]+)/);
-          const cleanUrl = matchUrl ? matchUrl[1] : sourceUrl || 'https://www.gov.ph';
-          const domain = cleanUrl.replace(/^https?:\/\//, '').split('/')[0];
-
-          return (
-            <div
-              key={idx}
-              className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500"
-            >
-              <div className="flex items-center gap-1 font-semibold text-emerald-700">
-                <ShieldCheck className="w-3 h-3 text-emerald-600 flex-shrink-0" />
-                <span>Verified Source Citation</span>
-              </div>
-              <a
-                href={cleanUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#093a96] font-bold hover:underline inline-flex items-center gap-1"
-              >
-                <span>{domain}</span>
-                <ExternalLink className="w-2.5 h-2.5" />
-              </a>
-            </div>
-          );
-        }
-
-        return (
-          <p key={idx} className="leading-relaxed">
-            {block.content}
-          </p>
-        );
-      })}
-
-      {/* Clickable Opportunity Recommendation Cards (Expands in Explore Navigation) */}
-      {matchedOpportunities && matchedOpportunities.length > 0 && (
-        <div className="space-y-2 pt-3 border-t border-blue-100/80">
-          <div className="text-[11px] font-bold text-[#093a96] flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <Compass className="w-3.5 h-3.5 text-[#093a96]" />
-              <span>Recommended Citizen Programs ({matchedOpportunities.length}):</span>
-            </span>
-            <span className="text-[10px] text-slate-400 font-normal">Click to expand</span>
-          </div>
-
-          <div className="space-y-2">
-            {matchedOpportunities.map((oppItem) => (
-              <div
-                key={oppItem.id}
-                onClick={() => onOpenOpportunity && onOpenOpportunity(oppItem)}
-                className="p-3 rounded-2xl bg-white border border-blue-200/90 hover:border-[#093a96] hover:shadow-md transition-all cursor-pointer group flex items-center justify-between gap-3 shadow-2xs"
-              >
-                <div className="space-y-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-[#093a96] border border-blue-200">
-                      {oppItem.agency || 'Government'}
-                    </span>
-                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200">
-                      {oppItem.matchScore || 92}% Match
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-bold text-[#0f172a] group-hover:text-[#093a96] transition-colors truncate">
-                    {oppItem.title}
-                  </h4>
-                  <p className="text-[10px] text-slate-500 line-clamp-1">
-                    {oppItem.shortDesc || oppItem.fullDesc}
-                  </p>
-                </div>
-
-                <div className="w-7 h-7 rounded-full bg-blue-50 group-hover:bg-[#093a96] group-hover:text-white text-[#093a96] flex items-center justify-center flex-shrink-0 transition-all">
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <AiMessageRenderer
+      text={text}
+      sourceUrl={sourceUrl}
+      matchedOpportunities={matchedOpportunities}
+      onOpenOpportunity={onOpenOpportunity}
+      onUploadDocument={onUploadDocument}
+      size="sm"
+    />
   );
 };
 
@@ -359,6 +147,8 @@ export const AskAlalayChatModal = () => {
     askAlalayOpen,
     setAskAlalayOpen,
     askAlalayOpportunity,
+    askAlalayInitialPrompt,
+    setAskAlalayInitialPrompt,
     setSelectedOpportunity,
     setActiveTab,
     user,
@@ -369,6 +159,7 @@ export const AskAlalayChatModal = () => {
     setLoadedChatSession,
     saveChatArchive,
     addToast,
+    openUploadForRequirement,
   } = useApp();
 
   const [messages, setMessages] = useState([]);
@@ -380,89 +171,24 @@ export const AskAlalayChatModal = () => {
 
   const opp = askAlalayOpportunity;
 
-  // Initialize Greeting or Load Archived Session
-  useEffect(() => {
-    if (askAlalayOpen) {
-      if (loadedChatSession && loadedChatSession.messages && loadedChatSession.messages.length > 0) {
-        setMessages(loadedChatSession.messages);
-        setCurrentSessionId(loadedChatSession.id);
-        setSessionTitle(loadedChatSession.title);
-      } else if (opp) {
-        const newId = `chat_${Date.now()}`;
-        setCurrentSessionId(newId);
-        setSessionTitle(`Consultation: ${opp.title}`);
-        setMessages([
-          {
-            id: 'init_opp',
-            sender: 'ai',
-            text: `Hello ${user?.firstName || 'there'}! I am grounded in official Citizen's Charters for ${opp.title} (${opp.agency}). What would you like to know about this service?`,
-            time: 'Just now',
-            sourceUrl: opp.officialSource?.url || 'https://www.philhealth.gov.ph',
-            matchedOpportunities: [opp],
-          },
-        ]);
-      } else {
-        const newId = `chat_${Date.now()}`;
-        setCurrentSessionId(newId);
-        setSessionTitle('');
-        setMessages([
-          {
-            id: 'init_gen',
-            sender: 'ai',
-            text: `Hi ${user?.firstName || 'there'}! I am ALALAY, your AI navigator grounded in verified Philippine government Citizen's Charters, scraped assistance programs, and statutory benefits. How can I assist you today?`,
-            time: 'Just now',
-            matchedOpportunities: opportunities.slice(0, 2),
-          },
-        ]);
-      }
-    }
-  }, [askAlalayOpen, opp, loadedChatSession, user?.firstName, opportunities]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
-
-  if (!askAlalayOpen) return null;
-
-  // Handler to open and expand the opportunity in Explore Navigation
-  const handleOpenOpportunity = (oppItem) => {
-    setSelectedOpportunity(oppItem);
-    setActiveTab('explore');
-    setAskAlalayOpen(false);
-  };
-
-  // Dynamic Suggestion Chips based on real Philippine assistance topics
-  const quickPills = opp
-    ? [
-        'What documents do I need for this?',
-        'Am I eligible for this program?',
-        'Where do I apply and submit?',
-      ]
-    : [
-        'Can I borrow money or apply for loans?',
-        'What benefits do Senior Citizens receive?',
-        'How do I claim DOH & Malasakit medical aid?',
-        'Are there student loans and tuition subsidies?',
-      ];
-
-  const handleSendMessage = async (textToSend) => {
-    const text = textToSend || inputValue.trim();
-    if (!text) return;
+  // Execute an automated or user-sent message
+  const executeQuery = async (queryText, baseMessages = []) => {
+    if (!queryText || !queryText.trim()) return;
 
     const userMsg = {
-      id: `usr_${Date.now()}`,
+      id: `user_${Date.now()}`,
       sender: 'user',
-      text,
+      text: queryText.trim(),
       time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
 
-    const updatedMsgList = [...messages, userMsg];
+    const updatedMsgList = [...baseMessages, userMsg];
     setMessages(updatedMsgList);
     setInputValue('');
     setIsTyping(true);
 
     try {
-      const replyText = await askAlalayAI(text, {
+      const replyText = await askAlalayAI(queryText, {
         contextType: opp ? 'benefit' : 'general',
         opp,
         user,
@@ -472,15 +198,12 @@ export const AskAlalayChatModal = () => {
         conversationHistory: messages,
       });
 
-      const matchedOpps = findMatchingOpportunities(replyText + ' ' + text, opportunities);
-
       const aiMsg = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
         text: replyText,
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         sourceUrl: opp?.officialSource?.url || 'https://www.gov.ph',
-        matchedOpportunities: matchedOpps,
       };
 
       const finalMessages = [...updatedMsgList, aiMsg];
@@ -492,14 +215,14 @@ export const AskAlalayChatModal = () => {
           sessionTitle ||
           (opp
             ? `Consultation: ${opp.title}`
-            : `Inquiry: ${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`);
+            : `Inquiry: ${queryText.slice(0, 50)}${queryText.length > 50 ? '...' : ''}`);
 
         setSessionTitle(titleToUse);
 
         saveChatArchive({
           id: currentSessionId || `chat_${Date.now()}`,
           title: titleToUse,
-          category: opp?.categoryName || (text.toLowerCase().includes('loan') ? 'Finance' : text.toLowerCase().includes('job') ? 'Employment' : text.toLowerCase().includes('health') ? 'Health' : 'Public Service'),
+          category: opp?.categoryName || (queryText.toLowerCase().includes('loan') ? 'Finance' : queryText.toLowerCase().includes('job') ? 'Employment' : queryText.toLowerCase().includes('health') ? 'Health' : 'Public Service'),
           categoryColor: opp?.categoryColor || '#093a96',
           timestamp: new Date().toISOString(),
           dateFormatted:
@@ -520,18 +243,119 @@ export const AskAlalayChatModal = () => {
       const aiErrMsg = {
         id: `ai_${Date.now()}`,
         sender: 'ai',
-        text: 'ALALAY is grounded in verified Citizen Charters. Please check with your nearest government agency branch or hospital Malasakit Center desk.',
+        text: `I encountered an issue fetching official guidelines for this service: ${err.message || 'Please try again.'}`,
         time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        matchedOpportunities: [],
       };
-      setMessages((prev) => [...prev, aiErrMsg]);
+      setMessages([...updatedMsgList, aiErrMsg]);
     } finally {
       setIsTyping(false);
     }
   };
 
+  // Initialize Greeting, Load Archived Session, or Trigger Auto Query
+  useEffect(() => {
+    if (askAlalayOpen) {
+      if (loadedChatSession && loadedChatSession.messages && loadedChatSession.messages.length > 0) {
+        setMessages(loadedChatSession.messages);
+        setCurrentSessionId(loadedChatSession.id);
+        setSessionTitle(loadedChatSession.title);
+      } else if (askAlalayInitialPrompt) {
+        const newId = `chat_${Date.now()}`;
+        setCurrentSessionId(newId);
+        setSessionTitle(opp ? `Consultation: ${opp.title}` : `Inquiry: ${askAlalayInitialPrompt.slice(0, 40)}`);
+        const promptToRun = askAlalayInitialPrompt;
+        setAskAlalayInitialPrompt('');
+        executeQuery(promptToRun, []);
+      } else if (opp) {
+        const newId = `chat_${Date.now()}`;
+        setCurrentSessionId(newId);
+        setSessionTitle(`Consultation: ${opp.title}`);
+        setMessages([
+          {
+            id: 'init_opp',
+            sender: 'ai',
+            text: `Hello ${user?.firstName || 'there'}! I have the official guidelines for **${opp.title}** (${opp.agency}). What would you like to know about this service?`,
+            time: 'Just now',
+            sourceUrl: opp.officialSource?.url || 'https://www.philhealth.gov.ph',
+          },
+        ]);
+      } else {
+        const newId = `chat_${Date.now()}`;
+        setCurrentSessionId(newId);
+        setSessionTitle('');
+        setMessages([
+          {
+            id: 'init_gen',
+            sender: 'ai',
+            text: `Hi ${user?.firstName || 'there'}! I am ALALAY, your AI navigator for verified Philippine government assistance programs and benefits. How can I assist you today?`,
+            time: 'Just now',
+          },
+        ]);
+      }
+    }
+  }, [askAlalayOpen, opp, loadedChatSession, askAlalayInitialPrompt, user?.firstName]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isTyping]);
+
+  if (!askAlalayOpen) return null;
+
+  // Handler to open and expand the opportunity in Explore Navigation
+  const handleOpenOpportunity = (oppItem) => {
+    setSelectedOpportunity(oppItem);
+    setActiveTab('explore');
+    setAskAlalayOpen(false);
+  };
+
+  const handleResponseFeedback = (messageId, value) => {
+    const updatedMessages = messages.map((message) => {
+      if (message.id !== messageId) return message;
+      return { ...message, feedback: message.feedback === value ? null : value };
+    });
+
+    setMessages(updatedMessages);
+
+    // Keep feedback in the saved chat when this conversation already exists.
+    if (
+      saveChatArchive &&
+      currentSessionId &&
+      updatedMessages.some((message) => message.sender === 'user')
+    ) {
+      const latestAiMessage = [...updatedMessages].reverse().find((message) => message.sender === 'ai');
+      saveChatArchive({
+        id: currentSessionId,
+        title: sessionTitle || (opp ? `Consultation: ${opp.title}` : 'Citizen Chat'),
+        preview: latestAiMessage?.text?.replace(/[#*•]/g, '').slice(0, 140) || '',
+        messageCount: updatedMessages.length,
+        sourceUrl: latestAiMessage?.sourceUrl || opp?.officialSource?.url || 'https://www.gov.ph',
+        messages: updatedMessages,
+      });
+    }
+  };
+
+  // Dynamic Suggestion Chips based on real Philippine assistance topics
+  const quickPills = opp
+    ? [
+      'What documents do I need for this?',
+      'Am I eligible for this program?',
+      'Where do I apply and submit?',
+    ]
+    : [
+      'Can I borrow money or apply for loans?',
+      'What benefits do Senior Citizens receive?',
+      'How do I claim DOH & Malasakit medical aid?',
+      'Are there student loans and tuition subsidies?',
+    ];
+
+  const handleSendMessage = async (textToSend) => {
+    const text = textToSend || inputValue.trim();
+    if (!text) return;
+    await executeQuery(text, messages);
+  };
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[92vw] sm:w-[420px] max-w-[440px] h-[540px] max-h-[85vh] bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden select-none animate-in slide-in-from-bottom-5 duration-200 flex flex-col">
+    <div className="fixed bottom-6 right-6 z-50 w-[94vw] sm:w-[480px] md:w-[520px] max-w-[540px] h-[600px] max-h-[88vh] bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden select-none animate-in slide-in-from-bottom-5 duration-200 flex flex-col">
       {/* Top Header */}
       <div className="bg-[#093a96] text-white px-5 py-3.5 flex items-center justify-between flex-shrink-0 shadow-xs">
         <div className="flex items-center gap-3">
@@ -543,15 +367,17 @@ export const AskAlalayChatModal = () => {
             />
           </div>
           <div>
-            <h3 className="text-sm font-bold leading-tight">ALALAY Assistant</h3>
-            <span className="text-[10px] text-blue-200 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              <span>Grounded in Live Government Charters</span>
-            </span>
+            <h3 className="font-extrabold text-sm tracking-tight flex items-center gap-1.5">
+              <span>ALALAY AI Citizen Guide</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </h3>
+            <p className="text-[11px] text-blue-100 font-medium truncate max-w-[200px] sm:max-w-[260px]">
+              {opp ? opp.title : 'Government Services & Benefits'}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => {
@@ -603,19 +429,56 @@ export const AskAlalayChatModal = () => {
               )}
 
               <div
-                className={`max-w-[88%] p-3.5 rounded-2xl leading-relaxed ${
-                  isAi
-                    ? 'bg-white border border-slate-200 text-slate-800 shadow-2xs'
+                className={`max-w-[94%] sm:max-w-[92%] p-3.5 rounded-2xl leading-relaxed ${isAi
+                    ? 'bg-white border border-slate-200 text-slate-800 shadow-2xs w-full'
                     : 'bg-[#093a96] text-white font-medium rounded-br-none whitespace-pre-line'
-                }`}
-              >
+                  }`}
+                >
                 {isAi ? (
-                  <FormattedAiMessage
-                    text={msg.text}
-                    sourceUrl={msg.sourceUrl}
-                    matchedOpportunities={msg.matchedOpportunities}
-                    onOpenOpportunity={handleOpenOpportunity}
-                  />
+                  <>
+                    <FormattedAiMessage
+                      text={msg.text}
+                      sourceUrl={msg.sourceUrl}
+                      matchedOpportunities={msg.matchedOpportunities}
+                      onOpenOpportunity={handleOpenOpportunity}
+                      onUploadDocument={openUploadForRequirement}
+                    />
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-3">
+                      <span className="text-[10px] text-slate-400 font-medium">
+                        {msg.feedback ? 'Thanks for the feedback.' : 'Was this helpful?'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleResponseFeedback(msg.id, 'good')}
+                          aria-label="Good response"
+                          aria-pressed={msg.feedback === 'good'}
+                          title="Good response"
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            msg.feedback === 'good'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                          }`}
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleResponseFeedback(msg.id, 'bad')}
+                          aria-label="Not a helpful response"
+                          aria-pressed={msg.feedback === 'bad'}
+                          title="Not a helpful response"
+                          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                            msg.feedback === 'bad'
+                              ? 'bg-rose-100 text-rose-700'
+                              : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
+                          }`}
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 ) : (
                   msg.text
                 )}
@@ -629,7 +492,7 @@ export const AskAlalayChatModal = () => {
             <div className="w-4 h-4 rounded-full bg-white p-0.5 flex items-center justify-center shadow-2xs animate-bounce">
               <img src={logoImg} alt="ALALAY" className="w-full h-full object-contain" />
             </div>
-            <span>ALALAY is analyzing scraped programs & charters...</span>
+            <span>ALALAY is checking government programs & guidelines...</span>
           </div>
         )}
 

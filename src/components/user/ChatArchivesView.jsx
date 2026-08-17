@@ -4,14 +4,11 @@ import {
   Sparkles,
   Search,
   Calendar,
-  Clock,
   ExternalLink,
   Trash2,
   Download,
   ArrowRight,
   ShieldCheck,
-  Building2,
-  FolderLock,
   Plus,
   Coins,
   HeartPulse,
@@ -20,7 +17,6 @@ import {
   Users,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { IOSCard } from '../common/IOSCard';
 export const ChatArchivesView = () => {
   const {
     chatArchives = [],
@@ -38,10 +34,10 @@ export const ChatArchivesView = () => {
   const currentUserId = user?.id || '';
 
   const categories = [
-    { id: 'all', label: 'All Consultations' },
+    { id: 'all', label: 'All Chats' },
     { id: 'finance', label: 'Finance & Loans', icon: Coins },
-    { id: 'employment', label: 'Jobs & Labor', icon: Briefcase },
-    { id: 'health', label: 'Healthcare & PhilHealth', icon: HeartPulse },
+    { id: 'employment', label: 'Jobs', icon: Briefcase },
+    { id: 'health', label: 'Health', icon: HeartPulse },
     { id: 'education', label: 'Education & Grants', icon: GraduationCap },
     { id: 'social', label: 'Social Services', icon: Users },
   ];
@@ -76,15 +72,15 @@ export const ChatArchivesView = () => {
       setLoadedChatSession(archive);
     }
     openAskAlalay(null, archive);
-    addToast('Chat Resumed', `Loaded previous consultation: "${archive.title}".`, 'info');
+    addToast('Chat Opened', `Opened saved chat: "${archive.title}".`, 'info');
   };
 
   const handleExportTranscript = (archive) => {
-    const transcriptText = `ALALAY CITIZEN AI CONSULTATION ARCHIVE
+    const transcriptText = `ALALAY CHAT TRANSCRIPT
 Title: ${archive.title}
 Date: ${archive.dateFormatted || archive.timestamp}
 Category: ${archive.category || 'General'}
-Source Citation: ${archive.sourceUrl || 'Official Government Portal'}
+Source: ${archive.sourceUrl || 'Official Government Portal'}
 ------------------------------------------------------------
 
 ${(archive.messages || [])
@@ -102,13 +98,13 @@ ${(archive.messages || [])
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    addToast('Transcript Exported', 'Downloaded complete conversation transcript.', 'success');
+    addToast('Chat Downloaded', 'Your chat transcript is ready.', 'success');
   };
 
   const handleDelete = (archive) => {
     if (
       window.confirm(
-        `Delete consultation archive "${archive.title}"?\n\nThis will remove it from your chat history.`
+        `Delete saved chat "${archive.title}"?\n\nThis will remove it from your chat history.`
       )
     ) {
       if (deleteChatArchive) {
@@ -127,11 +123,11 @@ ${(archive.messages || [])
               <MessageSquare className="w-5 h-5" />
             </div>
             <h1 className="text-xl sm:text-2xl font-black text-[#0f172a] tracking-tight">
-              Chat Archives & Consultation History
+              Saved Chats
             </h1>
           </div>
           <p className="text-xs text-slate-500 max-w-xl">
-            Review, resume, and export your previous AI consultations grounded in official citizen charters, statutory benefits, and scraped agency data.
+            Review or continue past chats about government services. Download a copy anytime.
           </p>
         </div>
 
@@ -141,56 +137,11 @@ ${(archive.messages || [])
           className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-[#093a96] hover:bg-[#072d75] text-white text-xs font-bold shadow-md shadow-blue-900/15 cursor-pointer transition-all active:scale-[0.98] self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
-          <span>New AI Consultation</span>
+          <span>New Chat</span>
         </button>
       </div>
 
-      {/* 2. Stats Quick Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 flex items-center gap-4 shadow-2xs">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#093a96] flex items-center justify-center flex-shrink-0">
-            <MessageSquare className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Total Consultations
-            </div>
-            <div className="text-2xl font-black text-[#0f172a]">
-              {(chatArchives || []).length}
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 flex items-center gap-4 shadow-2xs">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Grounded Verification
-            </div>
-            <div className="text-2xl font-black text-emerald-600">
-              100% Official
-            </div>
-          </div>
-        </div>
-
-        <div className="p-5 rounded-2xl bg-white border border-slate-200/80 flex items-center gap-4 shadow-2xs">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Programs Matched
-            </div>
-            <div className="text-2xl font-black text-purple-600">
-              {(chatArchives || []).reduce((acc, c) => acc + (c.messages?.length || 1), 0)} Q&A Nodes
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Search & Filter Bar */}
+      {/* 2. Search & Filter Bar */}
       <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-sm space-y-4">
         {/* Search Input */}
         <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5">
@@ -199,7 +150,7 @@ ${(archive.messages || [])
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search chat archives (e.g. 'SSS Calamity', 'PhilJobNet', 'Scholarship', 'PhilHealth')..."
+            placeholder="Search saved chats (e.g. SSS, scholarship, PhilHealth)..."
             className="w-full bg-transparent text-xs sm:text-sm font-medium outline-none text-slate-800 placeholder:text-slate-400"
           />
           {searchQuery && (
@@ -235,7 +186,7 @@ ${(archive.messages || [])
         </div>
       </div>
 
-      {/* 4. Archives List Cards */}
+      {/* 3. Saved Chats List */}
       <div className="space-y-4">
         {filteredArchives.length > 0 ? (
           filteredArchives.map((archive) => (
@@ -254,7 +205,7 @@ ${(archive.messages || [])
                   </span>
                   <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
                     <Calendar className="w-3 h-3 text-slate-400" />
-                    <span>{archive.dateFormatted || 'Recently Archived'}</span>
+                    <span>{archive.dateFormatted || 'Recently Saved'}</span>
                   </span>
                   <span className="text-[10px] text-slate-400 font-semibold bg-slate-100 px-2 py-0.5 rounded-full">
                     {archive.messages?.length || archive.messageCount || 2} Messages
@@ -264,7 +215,7 @@ ${(archive.messages || [])
                 <div className="flex items-center gap-1.5 self-end sm:self-auto">
                   <button
                     type="button"
-                    title="Export / Download Transcript"
+                    title="Download Chat"
                     onClick={() => handleExportTranscript(archive)}
                     className="p-2 rounded-xl text-slate-400 hover:text-[#093a96] hover:bg-blue-50 transition-colors cursor-pointer"
                   >
@@ -273,7 +224,7 @@ ${(archive.messages || [])
 
                   <button
                     type="button"
-                    title="Delete Archive"
+                    title="Delete Chat"
                     onClick={() => handleDelete(archive)}
                     className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                   >
@@ -292,11 +243,11 @@ ${(archive.messages || [])
                 </p>
               </div>
 
-              {/* Card Footer with Verified Source & Resume Action */}
+              {/* Card Footer with Source & Continue Action */}
               <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-1.5 text-slate-500 text-[11px]">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                  <span className="font-semibold text-slate-700">Official Citation:</span>
+                  <span className="font-semibold text-slate-700">Source:</span>
                   <a
                     href={archive.sourceUrl || 'https://www.gov.ph'}
                     target="_blank"
@@ -314,7 +265,7 @@ ${(archive.messages || [])
                   className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 hover:bg-[#093a96] text-[#093a96] hover:text-white font-bold text-xs transition-all cursor-pointer shadow-2xs"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
-                  <span>Resume Consultation</span>
+                  <span>Continue Chat</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -327,12 +278,12 @@ ${(archive.messages || [])
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-bold text-slate-800">
-                No Chat Archives Found
+                No Saved Chats Found
               </h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 {searchQuery
-                  ? `No consultation history matched your search for "${searchQuery}".`
-                  : 'You have not archived any AI consultations yet. Start an inquiry with ALALAY AI to ask about government benefits and loans.'}
+                  ? `No saved chats matched your search for "${searchQuery}".`
+                  : 'Your saved chats will appear here after you talk with ALALAY.'}
               </p>
             </div>
             <button
@@ -341,7 +292,7 @@ ${(archive.messages || [])
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#093a96] text-white text-xs font-bold shadow-md cursor-pointer hover:bg-[#072d75] transition-all"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Start New Consultation</span>
+              <span>Start a New Chat</span>
             </button>
           </div>
         )}
