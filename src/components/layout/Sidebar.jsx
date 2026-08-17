@@ -13,6 +13,7 @@ import {
   LogOut,
   Sparkles,
   Award,
+  ClipboardList,
 } from 'lucide-react';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { useApp } from '../../context/AppContext';
@@ -33,6 +34,7 @@ export const Sidebar = () => {
     { id: 'home', label: t('nav.home'), icon: Home },
     { id: 'explore', label: t('nav.explore'), icon: Compass },
     { id: 'ai-chat', label: t('nav.aiChat'), icon: Sparkles },
+    { id: 'apply', label: t('nav.apply'), icon: ClipboardList},
     { id: 'documents', label: t('nav.documents'), icon: FileText },
     { id: 'benefits', label: t('nav.benefits'), icon: Award },
     { id: 'chat-history', label: t('nav.chatArchives'), icon: MessageSquare },
@@ -71,7 +73,12 @@ export const Sidebar = () => {
                     }`}
                 >
                   <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                  <span>{item.label}</span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {item.isNew && !isActive && (
+                    <span className="text-[9px] font-extrabold bg-gradient-to-r from-violet-500 to-indigo-500 text-white px-1.5 py-0.5 rounded-full">
+                      NEW
+                    </span>
+                  )}
                 </button>
               );
             })

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Compass, Sparkles, MessageSquare, FolderLock, User, Bell } from 'lucide-react';
+import { Home, Compass, Sparkles, MessageSquare, FolderLock, ClipboardList } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import aiLogoImg from '../../assets/AIlogos.png';
 

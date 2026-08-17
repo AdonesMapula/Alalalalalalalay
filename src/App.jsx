@@ -23,6 +23,7 @@ import { OpportunityDetailModal } from './components/user/OpportunityDetailModal
 import { AskAlalayChatModal } from './components/user/AskAlalayChatModal';
 import { AskAlalayFloatingFab } from './components/common/AskAlalayFloatingFab';
 import { DocumentUploadModal } from './components/user/DocumentUploadModal';
+import { ApplicationIntakeAgent } from './components/user/ApplicationIntakeAgent';
 
 // Admin Views
 import { AdminDashboard } from './components/admin/AdminDashboard';
@@ -169,14 +170,16 @@ const MainAppContent = () => {
 
           {/* Dynamic Tab Router */}
           <main
-            className={`flex-1 min-h-0 ${activeTab === 'ai-chat'
-              ? 'px-4 sm:px-6 pb-3 overflow-hidden flex flex-col'
-              : 'px-6 sm:px-10 pb-20 md:pb-10 overflow-y-auto'
-              }`}
+            className={`flex-1 min-h-0 ${
+              activeTab === 'ai-chat' || activeTab === 'apply'
+                ? 'px-4 sm:px-6 pb-3 overflow-hidden flex flex-col'
+                : 'px-6 sm:px-10 pb-20 md:pb-10 overflow-y-auto'
+            }`}
           >
             {activeTab === 'home' && <HomeDashboard />}
             {activeTab === 'explore' && <ExploreCategories />}
             {activeTab === 'ai-chat' && <AskAlalayPageView />}
+            {activeTab === 'apply' && <ApplicationIntakeAgent />}
             {activeTab === 'documents' && <DocumentsView />}
             {activeTab === 'benefits' && <BenefitsView />}
             {activeTab === 'chat-history' && <ChatArchivesView />}

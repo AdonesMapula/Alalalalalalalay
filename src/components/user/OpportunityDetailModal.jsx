@@ -571,6 +571,43 @@ export const OpportunityDetailModal = () => {
               </a>
             )}
 
+            {/* Apply with AI Agent — maps opportunity to intake program */}
+            {(() => {
+              const oppTitle = (opp?.title || '').toLowerCase();
+              const oppAgency = (opp?.agency || '').toLowerCase();
+              const oppDesc = ((opp?.shortDesc || '') + ' ' + (opp?.fullDesc || '')).toLowerCase();
+              const combined = oppTitle + ' ' + oppAgency + ' ' + oppDesc;
+
+              let benefitId = null;
+              if (combined.includes('sss') && (combined.includes('loan') || combined.includes('salary'))) {
+                benefitId = 'sss-salary-loan';
+              } else if (combined.includes('dswd') || combined.includes('aics') || combined.includes('crisis')) {
+                benefitId = 'dswd-aics';
+              } else if (combined.includes('philhealth') || combined.includes('cf1') || combined.includes('claims')) {
+                benefitId = 'philhealth-cf1';
+              } else if (combined.includes('tupad') || combined.includes('dole') || combined.includes('employment')) {
+                benefitId = 'dole-tupad';
+              }
+
+              if (!benefitId) return null;
+
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedOpportunity(null);
+                    setActiveTab('apply');
+                    addToast('AI Agent Ready', `Starting application for ${opp.title}`, 'success');
+                  }}
+                  className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-violet-900/20 active:scale-[0.98]"
+                >
+                  <Bot className="w-4 h-4" />
+                  <span>Apply with AI Agent</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              );
+            })()}
+
             <button
               type="button"
               onClick={() => setIsSideChatOpen((prev) => !prev)}

@@ -3,68 +3,87 @@
 [![React 19](https://img.shields.io/badge/React-19.0.0-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Google Gemini AI](https://img.shields.io/badge/Gemini_AI-1.5_Flash-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
+[![Google Gemini AI](https://img.shields.io/badge/Gemini_AI-Flash_3.6_%2F_3.7-4285F4?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 
-**ALALAY** is a state-of-the-art Philippine public service discovery and navigation system. It bridges the gap between citizens and government welfare programs by coupling **statutory Citizen's Charters**, a **deterministic multi-factor eligibility engine**, a secure **Document Locker**, and **Google Gemini Generative AI** grounded in verified government data.
+**ALALAY** is a state-of-the-art Philippine public service discovery and navigation system. It bridges the gap between citizens and government welfare programs by coupling **statutory Citizen's Charters**, a **deterministic multi-factor eligibility engine**, an **Active Benefit Tracker**, a secure **DocAgent Document Vault**, an **Auto-Apply Consent Engine**, and **Google Gemini Generative AI** grounded in verified government data.
 
 ---
 
 ## 🚀 Key Features
 
-### 1. Multi-Factor Intelligent Benefits Matching Engine
+### 1. Active Benefit Tracker (Dedicated Entitlement Hub)
+- **Comprehensive Citizen Benefit Overview**: A dedicated workspace tracking all public benefits, statutory discounts, and government assistance programs that the citizen currently holds or has actively unlocked.
+- **Coverage Status & Expiration Watchdog**: Continuously monitors the active status, validity windows, renewal dates, and annual re-certification deadlines for all held benefits (e.g. OSCA Senior Citizen Social Pensions, PhilHealth Konsulta validity, PWD ID validity, SSS loan amortization schedules).
+- **Document Vault Cross-Referencing**: Directly links active benefits with supporting vault documents, proactively alerting the citizen if an expiring ID or clearance threatens their benefit continuity.
+- **Statutory Entitlement Value Summary**: Aggregates statutory discount privileges (20% discount + 12% VAT exemption under RA 9994 / RA 10754, 100% Free Higher Education under RA 10931, PhilHealth Zero-Balance Billing).
+
+---
+
+### 2. Multi-Factor Intelligent Benefits Matching Engine
 - **Deterministic Rules Primacy**: Financial calculations and statutory qualification logic are executed deterministically by [`rulesEngine.js`](./src/services/rulesEngine.js) to guarantee **zero AI hallucination**.
 - **Senior Citizens Centric Matching (RA 9994 / RA 10645)**: Intelligently calculates citizen age from Date of Birth and promotes OSCA social pensions, centenarian cash incentives, and 100% PhilHealth Zero-Balance Billing to the top with `🌟 Top Match for Senior Citizen ({age} yrs)`.
 - **Solo Parents Welfare (RA 11861)**: Automatically flags statutory 10% infant discounts, educational assistance, and parental leaves with `👨‍👧 Solo Parent Priority`.
 - **Persons with Disabilities (RA 10754)**: Detects PWD credentials and matches 20% discounts, 12% VAT exemption, and assistive medical devices (`♿ PWD Priority Support`).
 - **Employment & Salary Loans**: Matches contributing members with SSS Salary/Calamity loans and Pag-IBIG MP2/Housing options (`💼 Employed Member Benefit`), and links displaced workers with DOLE TUPAD and DSWD SLP (`🤝 Emergency Employment & Aid`).
 - **Indigent Safety Net**: Automatically matches low-income citizens with 100% DOH Medical Assistance for Indigent Patients (MAP), PCSO IMAP, and DSWD AICS emergency grants (`🤝 Indigent Safety Net Priority`).
-- **Document Locker Readiness Gauge**: Calculates exact document completeness (`docReadinessPercent`) and alerts citizens to missing prerequisites before applying.
+- **First-Time Jobseekers Waiver (RA 11261)**: Automatically flags 100% fee waivers for Barangay Clearance, NBI Clearance, Police Clearance, and Medical Certificates for graduating jobseekers.
 
 ---
 
-### 2. Dedicated AI Citizen Consultation Workspace (`AskAlalayPageView.jsx`)
+### 3. Auto-Apply Consent & Application Queue Engine
+- **Strict 95%+ "Likely Eligible" Bar**: Automatically prepares and queues applications only when the citizen's demographics and verified vault documents achieve a 95%+ match.
+- **Two Authorized Consent Modes**:
+  - *Confirm Each Application (Recommended)*: AI prepares the submission as "Ready to Submit" for citizen review and 1-tap confirmation.
+  - *Full Automation*: Submits 95%+ verified statutory claims autonomously and logs them in Application History.
+- **Category Selectivity**: Citizens can restrict Auto-Apply to specific benefit sectors (e.g. Health, Social Welfare, Education, Jobs).
+
+---
+
+### 4. DocAgent AI Document Vault & Expiration Sentinel
+- **Autonomous OCR Parsing**: Ingests and extracts key metadata from PhilSys IDs, Barangay Clearances, Indigency Certificates, and medical abstracts.
+- **Proactive Expiration Watchdog**: Alerts citizens before credentials lapse and provides a step-by-step **DocAgent Renewal Modal** for 1-click re-issuance guides.
+- **Vault Health Meter**: Computes real-time document compliance scores cross-referenced against statutory Citizen's Charters.
+
+---
+
+### 5. Conversational Application Intake Agent (`ApplicationIntakeAgent.jsx`)
+- **Step-by-Step AI Form Assistant**: Interactive intake guide walking citizens through application forms, field-by-field preparation, and document attachment verification.
+- **Readiness Verification**: Validates mandatory credentials before submission to avoid rejected applications at government front desks.
+
+---
+
+### 6. Intent-Aware Smart RAG & Multi-Strategy Web Scrapers
+- **Subject vs. Intent Parser (`analyzeQuestion`)**: Separates query subject from requested intent (available options vs. requirements vs. eligibility vs. fees vs. application steps), eliminating keyword collision errors.
+- **Scraped Agency Directory**: Live integration with official `.gov.ph` agency portals and statutory benefit circulars.
+- **Cheerio & Facebook Scraper**: Continuous scanning of official government announcement feeds with SHA-256 deduplication hashing.
+
+---
+
+### 7. Bilingual English & Filipino (Tagalog) i18n Localization (`translations.js`)
+- Seamless language toggle supporting both **English** and **Filipino (Tagalog)** across all navigation, dashboard, explore, documents, active benefit tracking, and profile screens.
+
+---
+
+### 8. Dedicated AI Citizen Consultation Workspace (`AskAlalayPageView.jsx`)
 - **Full-Viewport Fixed Card Height**: Designed to fit snugly inside the screen viewport without creating outer browser scrollbars.
-- **Fixed Header & Input Bar**: The top consultation header and bottom input form remain permanently docked in view while **only the middle conversation area scrolls**.
+- **Fixed Header & Input Bar**: Docked header and bottom input island with an independently scrolling conversation stream.
 - **Step-by-Step Interactive Cards**: AI responses are formatted into numbered procedural steps, clear requirement checklists, and verified `.gov.ph` citation badges.
-- **Topic Shortcuts**: 1-click consultation presets for *🏥 Hospital Subsidies*, *💼 SSS Loans*, *👴 Senior Citizen Free Healthcare*, *🎓 UniFAST Grants*, and *🤝 DSWD Crisis Aid*.
 - **Transcript Export**: 1-click download of the complete consultation log as a clean `.txt` document.
 
 ---
 
-### 3. Responsive 3 : 1 Dual-Card Service Detail Modal (`OpportunityDetailModal.jsx`)
-- **Smooth Sliding Layout**: Clicking *"Ask ALALAY About This Service"* slides the main 3/4 detail card to the left and smoothly mounts the 1/4 AI chat card on the right.
-- **Sticky Headers & Action Footers**: Program overviews, statutory entitlements, and document checklists scroll independently while the header and action buttons stay fixed.
-- **Dedicated Workspace Navigator (`Maximize2`)**: 1-click button in the chat modal header that expands the consultation into the full-page workspace.
-- **Grounded Charter Analysis**: Side AI chat references the exact Citizen's Charter of the selected service.
+### 9. Responsive 3 : 1 Dual-Card Service Detail Modal (`OpportunityDetailModal.jsx`)
+- **Smooth Sliding Layout**: Smoothly slides the 3/4 detail card and mounts the 1/4 live side AI chat card.
+- **Sticky Headers & Action Footers**: Program overviews and document checklists scroll independently while action buttons remain fixed.
+- **Full-Page Navigator (`Maximize2`)**: 1-click transition from modal to full-page consultation workspace.
 
 ---
 
-### 4. User-Isolated Real-time Chat Archives
-- **Strict User Privacy**: Chat archives in Supabase are strictly filtered by `user_email` and `user_id`. Citizens only see their own private consultations.
-- **Per-User LocalStorage Cache**: Consultations are cached under partitioned keys (`alalay_chat_archives_${userEmail}`) for instantaneous offline-ready access.
-- **Seamless Session Resumption**: Reopening a previously viewed service automatically restores the active conversation history unless cleared by the citizen.
-
----
-
-### 5. Admin Operations Hub (`AdminDashboard.jsx`)
-- **Fixed Non-Scrolling Admin Sidebar**: Pinned with `h-screen sticky top-0` so navigation, database deployment, and sign-out controls are permanently accessible regardless of content length.
-- **Citizen User Management**: Allows administrators to create and manage citizen profiles with **Date of Birth (`birth_date`)**, **Citizenship**, PWD, and Solo Parent flags.
+### 10. Admin Operations Hub (`AdminDashboard.jsx`)
+- **Fixed Non-Scrolling Admin Sidebar**: Pinned with `h-screen sticky top-0` for permanent navigation access.
+- **Citizen User Management**: Create and manage citizen profiles with **Date of Birth (`birth_date`)**, **Citizenship**, PWD, and Solo Parent flags.
 - **Real-Time Web & Social Scraper**: Scrapes and analyzes government agency Facebook announcements and `.gov.ph` portals with automatic JSON parsing and AI categorization.
-- **Knowledge Base & Two-Tier Source Governance**: Manages authoritative Tier A Citizen's Charters and moderates Tier B unverified public notices.
-
----
-
-### 6. Document Locker Vault & Auto-Fulfillment
-- Secure storage for digital citizen credentials (PhilSys National ID, OSCA Senior ID, Barangay Indigency, PhilHealth MDR, PWD ID, Birth Certificate).
-- Automatically cross-referenced against service requirements with visual **Auto-Verified in Locker ✓** badges.
-
----
-
-### 7. Custom Design System & Thin Blue Scrollbars (`index.css`)
-- **Global Thin Blue Scrollbars**: Custom `6px` ultra-thin scrollbars styled with ALALAY's primary blue (`#093a96`) and dark navy hover state (`#072d75`).
-- **Glassmorphism & Micro-Animations**: GPU-accelerated cubic-bezier transitions (`animate-modal-in`, `animate-side-in`, `animate-message-pop`).
-- **Responsive Layouts**: Seamless desktop sidebar layout and mobile bottom navigation tab bar (`BottomTabBar.jsx`).
 
 ---
 
@@ -72,7 +91,7 @@
 
 For detailed technical specifications on our safety architecture, refer to:
 - 📖 [**`SYSTEM_ARCHITECTURE.md`**](./SYSTEM_ARCHITECTURE.md) — Comprehensive component architecture, data flow sequences, and pastable Mermaid diagrams.
-- 🛡️ [**`AI_GUARDRAILS.md`**](./AI_GUARDRAILS.md) — The 8 layers of AI guardrails, anti-hallucination protocols, dual-key failover system, and Data Privacy Act (RA 10173) compliance.
+- 🛡️ [**`AI_GUARDRAILS.md`**](./AI_GUARDRAILS.md) — The 8 layers of AI guardrails, anti-hallucination protocols, strict civic scope guardrails, dual-key failover system, and Data Privacy Act (RA 10173) compliance.
 
 ---
 
@@ -83,9 +102,11 @@ For detailed technical specifications on our safety architecture, refer to:
 | **Frontend Framework** | React 19, Vite 6 |
 | **Styling & Design System** | Tailwind CSS 4, Custom Thin Scrollbars, Glassmorphism |
 | **Icons & Typography** | Lucide React, Plus Jakarta Sans |
-| **Generative AI** | Google Gemini 1.5 Flash / 2.0 Flash (`@google/genai` & REST) |
+| **Generative AI** | Google Gemini Flash 3.6 / 3.7 / 2.5 / 2.0 (`@google/genai` & REST) |
 | **Backend & Database** | Supabase (PostgreSQL, Row-Level Security, Realtime) |
 | **Deterministic Engine** | Custom JavaScript Rules Engine (`rulesEngine.js`) |
+| **Document Sentinel** | DocAgent OCR & Expiration Service (`docAgentService.js`) |
+| **Localization** | Custom Bilingual i18n Engine (`translations.js`) |
 
 ---
 
@@ -98,8 +119,8 @@ For detailed technical specifications on our safety architecture, refer to:
 ### 2. Installation
 ```bash
 # Clone the repository
-git clone https://github.com/AdonesMapula/Alalalalalalalay.git
-cd Alalay
+git clone https://github.com/WMROger/Alalalalalalalay.git
+cd Alalalalalalalay
 
 # Install dependencies
 npm install
@@ -139,6 +160,9 @@ npm run build
 - **RA 11032**: *Ease of Doing Business and Efficient Government Service Delivery Act (Citizen's Charter)*
 - **RA 10173**: *Data Privacy Act of 2012 (DPA)*
 - **RA 11223**: *Universal Health Care Act (UHC)*
+- **RA 11261**: *First-Time Jobseekers Assistance Act*
+- **RA 10931**: *Universal Access to Quality Tertiary Education Act (Free Higher Education)*
+- **RA 11909**: *Permanent Validity of Birth Certificates Act*
 
 ---
 

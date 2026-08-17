@@ -161,14 +161,237 @@ export function normalizeQueryString(rawQuery = '') {
   return q;
 }
 
+const STOP_WORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'what', 'which', 'where',
+  'when', 'how', 'can', 'could', 'would', 'should', 'are', 'is', 'do', 'does',
+  'did', 'get', 'got', 'give', 'tell', 'please', 'about', 'into', 'your',
+  'you', 'my', 'me', 'our', 'their', 'they', 'them', 'a', 'an', 'to', 'of',
+  'in', 'on', 'at', 'or', 'as', 'be', 'it', 'its', 'i', 'am', 'we', 'us',
+  'na', 'ng', 'ang', 'mga', 'para', 'sa', 'ito', 'iyon', 'ako', 'ko', 'mo',
+  'saan', 'paano', 'ano', 'may', 'meron', 'pwede', 'po', 'ba', 'yung', 'kung',
+]);
+
+export const QUESTION_INTENTS = {
+  LIST: 'list_available_options',
+  REQUIREMENTS: 'requirements',
+  ELIGIBILITY: 'eligibility',
+  APPLICATION: 'application_process',
+  LOCATION: 'location_or_office',
+  BENEFITS: 'benefits_or_coverage',
+  FEES: 'fees_or_cost',
+  PROCESSING: 'processing_time_or_status',
+  DOCUMENTS: 'documents',
+  GENERAL: 'general_information',
+};
+
+export function normalizeText(text = '') {
+  return String(text)
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9áéíóúñü₱\s-]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function tokenize(text = '') {
+  return normalizeText(text)
+    .split(/\s+/)
+    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+}
+
+export function includesAny(text, phrases = []) {
+  const q = normalizeText(text);
+  return phrases.some((phrase) => q.includes(normalizeText(phrase)));
+}
+
+/**
+ * Understand the shape of the question before retrieving documents.
+ */
+export function analyzeQuestion(userQuery = '', conversationHistory = []) {
+  const q = normalizeQueryString(userQuery);
+  const tokens = tokenize(q);
+  const recent = Array.isArray(conversationHistory)
+    ? conversationHistory.slice(-6).map((m) => {
+      if (typeof m === 'string') return m;
+      return m?.content || m?.text || '';
+    }).filter(Boolean)
+    : [];
+
+  const combinedForReference = [...recent, userQuery].join(' ');
+
+  let intent = QUESTION_INTENTS.GENERAL;
+  let confidence = 0.55;
+
+  if (includesAny(q, [
+    'requirements', 'requirement', 'what do i need', 'what do i need to bring',
+    'documents needed', 'documents required', 'papers needed', 'needed to apply',
+    'ano ang requirements', 'anong requirements', 'ano kailangan', 'mga kailangan',
+    'requirements to get', 'requirements for',
+  ])) {
+    intent = QUESTION_INTENTS.REQUIREMENTS;
+    confidence = 0.98;
+  } else if (includesAny(q, [
+    'am i eligible', 'eligible', 'qualify', 'qualified', 'who can apply',
+    'who qualifies', 'can i apply', 'pasok ba ako', 'pwede ba ako',
+    'sino ang qualified', 'sino ang eligible',
+  ])) {
+    intent = QUESTION_INTENTS.ELIGIBILITY;
+    confidence = 0.97;
+  } else if (includesAny(q, [
+    'how to apply', 'how do i apply', 'how can i apply', 'how to get',
+    'how do i get', 'how can i get', 'steps', 'step by step', 'process of getting',
+    'process to apply', 'application process', 'paano kumuha', 'paano mag apply',
+    'paano mag-apply', 'paano makakuha', 'saan kumuha', 'where can i get',
+  ])) {
+    intent = QUESTION_INTENTS.APPLICATION;
+    confidence = 0.96;
+  } else if (includesAny(q, [
+    'how much', 'fee', 'fees', 'cost', 'price', 'magkano', 'bayad', 'magkano ang', 'libre', 'free',
+  ])) {
+    intent = QUESTION_INTENTS.FEES;
+    confidence = 0.96;
+  } else if (includesAny(q, [
+    'how long', 'processing time', 'when will', 'when can i get', 'release',
+    'gaano katagal', 'kailan makukuha', 'status', 'pending', 'validity', 'duration', 'expire',
+  ])) {
+    intent = QUESTION_INTENTS.PROCESSING;
+    confidence = 0.95;
+  } else if (includesAny(q, [
+    'where is', 'where can i apply', 'where do i apply', 'nearest', 'office',
+    'branch', 'location', 'address', 'saan pwede', 'saan mag apply', 'saan ako pupunta',
+  ])) {
+    intent = QUESTION_INTENTS.LOCATION;
+    confidence = 0.94;
+  } else if (includesAny(q, [
+    'what benefits', 'benefits', 'what do i get', 'what assistance', 'how much assistance',
+    'covered', 'coverage', 'entitlement', 'ano ang benefit', 'ano makukuha',
+  ])) {
+    intent = QUESTION_INTENTS.BENEFITS;
+    confidence = 0.94;
+  } else if (includesAny(q, [
+    'what loans', 'which loans', 'available loans', 'loans available',
+    'what programs', 'which programs', 'available programs', 'what assistance is available',
+    'what grants', 'which grants', 'ano ang mga loan', 'anong loan', 'anong programa',
+    'mga available', 'what options', 'which options',
+  ])) {
+    intent = QUESTION_INTENTS.LIST;
+    confidence = 0.95;
+  } else if (includesAny(q, [
+    'what documents', 'which documents', 'document', 'documents', 'id needed',
+    'valid id', 'anong dokumento', 'anong id',
+  ])) {
+    intent = QUESTION_INTENTS.DOCUMENTS;
+    confidence = 0.88;
+  }
+
+  const topicKeywords = [];
+  const topicGroups = [
+    ['loan', 'loans', 'pautang', 'utang', 'salary loan', 'calamity loan', 'multi purpose loan'],
+    ['student', 'students', 'tuition', 'scholarship', 'school', 'education', 'tes', 'spes'],
+    ['senior', 'elderly', 'osca', 'pension'],
+    ['medical', 'hospital', 'medicine', 'malasakit', 'doh', 'health'],
+    ['job', 'work', 'employment', 'trabaho', 'dole', 'tupad', 'hiring', 'vacancy'],
+    ['sss'],
+    ['philhealth', 'pmrf', 'mrf', 'mdr'],
+    ['dswd', 'aics'],
+    ['pag-ibig', 'pagibig', 'hdmf'],
+    ['ched', 'unifast'],
+    ['tesda'],
+    ['barangay clearance', 'barangay certificate', 'barangay indigency', 'barangay residency', 'barangay'],
+    ['nbi clearance', 'nbi'],
+    ['police clearance', 'police'],
+    ['birth certificate', 'psa'],
+    ['passport', 'dfa'],
+    ['driver license', 'drivers license', 'lto'],
+    ['tin', 'bir'],
+  ];
+
+  topicGroups.forEach((group) => {
+    if (group.some((term) => q.includes(normalizeText(term)))) {
+      topicKeywords.push(group[0]);
+    }
+  });
+
+  const isFollowUp = includesAny(q, [
+    'it', 'that', 'this', 'the loan', 'the program', 'that loan', 'that program',
+    'those', 'them', 'same program', 'yung loan', 'yung program',
+  ]) && recent.length > 0;
+
+  return {
+    intent,
+    confidence,
+    topicKeywords,
+    queryTokens: tokens,
+    isFollowUp,
+    conversationContext: combinedForReference,
+    originalQuestion: userQuery,
+  };
+}
+
+export function getOpportunityText(item = {}) {
+  return [
+    item.title,
+    item.agency,
+    item.categoryName,
+    item.category,
+    item.shortDesc,
+    item.fullDesc,
+    ...(item.benefits || []),
+    ...(item.requirements || []).map((r) => (typeof r === 'string' ? r : r?.name || '')),
+    item.eligibility,
+    item.qualification,
+    item.applicationProcess,
+    item.process,
+    item.fees,
+    item.processingTime,
+  ].filter(Boolean).join(' ');
+}
+
+export function scoreTextOverlap(queryTokens, itemText) {
+  if (!queryTokens.length) return 0;
+  const text = normalizeText(itemText);
+  const matched = queryTokens.filter((token) => text.includes(token));
+  return Math.min(24, matched.length * 3);
+}
+
+export function scoreIntent(intent, item = {}) {
+  const requirements = (item.requirements || []).length > 0 || !!item.requirements;
+  const benefits = (item.benefits || []).length > 0 || !!item.benefits;
+  const process = !!(item.applicationProcess || item.process || item.howToApply);
+  const eligibility = !!(item.eligibility || item.qualification || item.qualifications);
+  const fees = !!item.fees;
+  const processing = !!item.processingTime;
+
+  switch (intent) {
+    case QUESTION_INTENTS.REQUIREMENTS:
+    case QUESTION_INTENTS.DOCUMENTS:
+      return requirements ? 22 : -6;
+    case QUESTION_INTENTS.BENEFITS:
+      return benefits ? 22 : -4;
+    case QUESTION_INTENTS.APPLICATION:
+      return process ? 22 : 0;
+    case QUESTION_INTENTS.ELIGIBILITY:
+      return eligibility ? 22 : -4;
+    case QUESTION_INTENTS.FEES:
+      return fees ? 22 : -3;
+    case QUESTION_INTENTS.PROCESSING:
+      return processing ? 22 : -3;
+    case QUESTION_INTENTS.LIST:
+      return 8;
+    default:
+      return 0;
+  }
+}
+
 /**
  * Autonomous Full-Spectrum Knowledge Retriever across all Scraped Government Websites & Databases
  */
 export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
-  const { opportunities = [], sources = [], opp = null } = database;
+  const { opportunities = [], sources = [], opp = null, conversationHistory = [] } = database;
   const oppsToSearch = Array.isArray(opportunities) ? opportunities : [];
+  const plan = analyzeQuestion(userQuery, conversationHistory);
   const q = normalizeQueryString(userQuery || '');
-  const queryTokens = q.split(/\s+/).filter((w) => w.length > 2);
+  const queryTokens = plan.queryTokens;
 
   const scoredChunks = [];
 
@@ -176,6 +399,7 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
   if (opp) {
     scoredChunks.push({
       score: 150,
+      relevance: 'explicit-current-opportunity',
       title: opp.title,
       agency: opp.agency,
       category: opp.categoryName || opp.category,
@@ -183,7 +407,7 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
       fullDesc: opp.fullDesc,
       benefits: opp.benefits || [],
       requirements: opp.requirements || [],
-      content: `${opp.title} (${opp.agency}). ${opp.fullDesc || opp.shortDesc}. Benefits: ${(opp.benefits || []).join(', ')}. Requirements: ${(opp.requirements || []).map((r) => (typeof r === 'string' ? r : r.name)).join(', ')}.`,
+      content: `Target Program: ${opp.title} (${opp.agency}). ${opp.fullDesc || opp.shortDesc || ''}. Benefits: ${(opp.benefits || []).join(', ')}. Requirements: ${(opp.requirements || []).map((r) => (typeof r === 'string' ? r : r?.name || '')).join(', ')}.`,
       sourceUrl: opp.officialSource?.url || 'https://www.gov.ph',
       rawItem: opp,
     });
@@ -201,30 +425,28 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
     // Never return job postings if the citizen is asking a civic/document/legal question
     if (isJobPosting && !isJobSearchQuery) return;
 
-    const itemAgency = (item.agency || '').toLowerCase();
-    const itemCategory = (item.categoryName || item.category || '').toLowerCase();
-    const itemDesc = ((item.shortDesc || '') + ' ' + (item.fullDesc || '')).toLowerCase();
-    const itemBenefits = (item.benefits || []).join(' ').toLowerCase();
-    const itemReqs = (item.requirements || []).map((r) => (typeof r === 'string' ? r : r.name)).join(' ').toLowerCase();
-
-    const itemFullText = `${itemTitle} ${itemAgency} ${itemCategory} ${itemDesc} ${itemBenefits} ${itemReqs}`;
-
+    const itemText = getOpportunityText(item);
+    const normalizedItem = normalizeText(itemText);
     let score = 0;
-    if (q.includes(itemTitle) || itemTitle.includes(q)) score += 60;
-    if (q.includes(itemAgency) || itemAgency.includes(q)) score += 40;
-    if (itemFullText.includes(q)) score += 30;
 
-    queryTokens.forEach((token) => {
-      if (itemTitle.includes(token)) score += 18;
-      if (itemAgency.includes(token)) score += 14;
-      if (itemBenefits.includes(token)) score += 10;
-      if (itemReqs.includes(token)) score += 8;
-      if (itemFullText.includes(token)) score += 5;
+    if (q.includes(itemTitle) || itemTitle.includes(q)) score += 60;
+    if (q.length >= 8 && normalizedItem.includes(q)) score += 28;
+
+    plan.topicKeywords.forEach((topic) => {
+      if (normalizedItem.includes(normalizeText(topic))) score += 14;
     });
 
-    if (score > 0) {
+    score += scoreTextOverlap(queryTokens, normalizedItem);
+    score += scoreIntent(plan.intent, item);
+
+    if (plan.intent === QUESTION_INTENTS.LIST) {
+      if (includesAny(itemText, ['loan', 'program', 'assistance', 'grant', 'subsidy'])) score += 10;
+    }
+
+    if (score > 10) {
       scoredChunks.push({
         score,
+        relevance: score >= 35 ? 'strong' : 'supporting',
         title: item.title,
         agency: item.agency,
         category: item.categoryName || item.category,
@@ -232,7 +454,7 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
         fullDesc: item.fullDesc,
         benefits: item.benefits || [],
         requirements: item.requirements || [],
-        content: `${item.title} (${item.agency}): ${item.fullDesc || item.shortDesc}. Benefits: ${(item.benefits || []).join(', ')}. Requirements: ${(item.requirements || []).map((r) => (typeof r === 'string' ? r : r.name)).join(', ')}.`,
+        content: `${item.title} (${item.agency}): ${item.fullDesc || item.shortDesc || ''}. Benefits: ${(item.benefits || []).join(', ')}. Requirements: ${(item.requirements || []).map((r) => (typeof r === 'string' ? r : r?.name || '')).join(', ')}. Eligibility: ${item.eligibility || item.qualification || item.qualifications || 'Available under agency criteria'}.`,
         sourceUrl: item.officialSource?.url || 'https://www.gov.ph',
         rawItem: item,
       });
@@ -266,6 +488,7 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
       if (score > 0) {
         scoredChunks.push({
           score,
+          relevance: 'agency-directory',
           title: agencyData.name,
           agency: agencyData.title,
           category: agencyData.category,
@@ -283,7 +506,7 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
 
   // 4. Authoritative Statutory Benefits
   (AUTHORITATIVE_BENEFITS || []).forEach((b) => {
-    const bText = `${b.program_name} ${b.agency} ${b.benefit_type} ${b.amount_cap_summary} ${b.covered_expenses.join(' ')} ${b.required_documents.join(' ')}`.toLowerCase();
+    const bText = `${b.program_name} ${b.agency} ${b.benefit_type} ${b.amount_cap_summary} ${(b.covered_expenses || []).join(' ')} ${(b.required_documents || []).join(' ')}`.toLowerCase();
     let score = 0;
     queryTokens.forEach((t) => {
       if (bText.includes(t)) score += 10;
@@ -291,14 +514,15 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
     if (score > 0) {
       scoredChunks.push({
         score,
+        relevance: 'statutory-mandate',
         title: b.program_name,
         agency: b.agency,
         category: b.benefit_type,
         shortDesc: b.amount_cap_summary,
         fullDesc: b.amount_cap_summary,
-        benefits: b.covered_expenses,
-        requirements: b.required_documents,
-        content: `${b.program_name} (${b.agency}): ${b.amount_cap_summary}. Covered: ${b.covered_expenses.join(', ')}. Documents: ${b.required_documents.join(', ')}. Where to Apply: ${b.where_to_apply}. Processing: ${b.processing_time}.`,
+        benefits: b.covered_expenses || [],
+        requirements: b.required_documents || [],
+        content: `${b.program_name} (${b.agency}): ${b.amount_cap_summary}. Covered: ${(b.covered_expenses || []).join(', ')}. Documents: ${(b.required_documents || []).join(', ')}. Where to Apply: ${b.where_to_apply}. Processing: ${b.processing_time}.`,
         sourceUrl: 'https://www.gov.ph',
         rawItem: b,
       });
@@ -309,20 +533,46 @@ export function retrieveRelevantKnowledgeChunks(userQuery, database = {}) {
   return scoredChunks;
 }
 
+export function classifyQueryIntent(userQuery, ragChunks = [], conversationHistory = []) {
+  const plan = analyzeQuestion(userQuery, conversationHistory);
+
+  if (ragChunks.some((chunk) => chunk.score >= 35)) return 'rag';
+
+  if (plan.topicKeywords.some((topic) => [
+    'barangay clearance', 'nbi clearance', 'police clearance', 'birth certificate',
+    'passport', 'driver license', 'tin',
+  ].includes(topic))) {
+    return ragChunks.length > 0 ? 'hybrid' : 'general';
+  }
+
+  return ragChunks.length > 0 ? 'rag' : 'general';
+}
+
 /**
- * Build dynamic RAG grounding context from all scraped websites, opportunities, and citizen profile
+ * Build RAG context formatting retrieved candidates and citizen profile
  */
 export function buildGroundingContext(userQuery, options = {}) {
-  const { opp, user, opportunities = [], sources = [], userDocs = [] } = options;
+  const {
+    opp,
+    user,
+    opportunities = [],
+    sources = [],
+    userDocs = [],
+    conversationHistory = [],
+  } = options;
 
+  const plan = analyzeQuestion(userQuery, conversationHistory);
   const retrievedChunks = retrieveRelevantKnowledgeChunks(userQuery, {
     opp,
     opportunities,
     sources,
     userDocs,
+    conversationHistory,
   });
 
   let rag = '\n\n## VERIFIED REAL-TIME SCRAPED GOVERNMENT KNOWLEDGE BASE (OFFICIAL .GOV.PH DATA):\n';
+  rag += `Question intent: ${plan.intent}\n`;
+  rag += `Topic(s): ${plan.topicKeywords.join(', ') || 'general'}\n\n`;
 
   if (retrievedChunks.length > 0) {
     retrievedChunks.slice(0, 6).forEach((chunk, i) => {
@@ -351,7 +601,6 @@ export function buildGroundingContext(userQuery, options = {}) {
     if (userDocs && userDocs.length > 0) {
       rag += `• Uploaded Verified Documents in Vault: ${userDocs.map((d) => d.name).join(', ')}\n`;
     }
-    rag += '\n';
   }
 
   return rag;
@@ -360,7 +609,7 @@ export function buildGroundingContext(userQuery, options = {}) {
 /**
  * Intelligent Dynamic Question Answering Engine (Generates direct, context-aware answers without forced robotic templates)
  */
-function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
+export function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
   const normQ = normalizeQueryString(cleanQ);
   const item = chunk?.rawItem || chunk || {};
   const title = chunk?.title || item.title || item.name || 'Government Program';
@@ -370,7 +619,7 @@ function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
   const requirements = Array.isArray(item.requirements) ? item.requirements : Array.isArray(item.required_documents) ? item.required_documents : [];
   const sourceUrl = chunk?.sourceUrl || item.officialSource?.url || 'https://www.gov.ph';
 
-  // 1. INTENT ANALYSIS: VALIDITY / EXPIRATION / DURATION (Checked first if query asks for validity)
+  // 1. INTENT ANALYSIS: VALIDITY / EXPIRATION / DURATION
   const isValidityQuery =
     normQ.includes('validity') ||
     normQ.includes('expire') ||
@@ -441,7 +690,7 @@ function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
     normQ.includes('residency') ||
     normQ.includes('cedula');
 
-  if (isBarangayQuery && (normQ.includes('apply') || normQ.includes('cert') || normQ.includes('clearance') || normQ.includes('indigency') || normQ.includes('residency') || normQ.includes('avail'))) {
+  if (isBarangayQuery && (normQ.includes('apply') || normQ.includes('cert') || normQ.includes('clearance') || normQ.includes('indigency') || normQ.includes('residency') || normQ.includes('avail') || normQ.includes('how to apply'))) {
     return (
       `**Step-by-Step Guide: How to Avail a Barangay Certificate, Indigency, or Clearance** (DILG / Local Barangay Hall)\n\n` +
       `Barangay Certificates and Indigency Certifications are officially issued by the **Office of the Barangay Secretary and Punong Barangay** at your local Barangay Hall.\n\n` +
@@ -497,7 +746,7 @@ function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
     normQ.includes('osca') ||
     normQ.includes('elderly');
 
-  if (isSeniorIdQuery && (normQ.includes('id') || normQ.includes('apply') || normQ.includes('benefits') || normQ.includes('discount') || normQ.includes('requirements'))) {
+  if (isSeniorIdQuery && (normQ.includes('id') || normQ.includes('apply') || normQ.includes('benefits') || normQ.includes('discount') || normQ.includes('requirements') || normQ.includes('how to apply'))) {
     return (
       `**OSCA Senior Citizen ID Registration & Statutory Benefits (Republic Act No. 9994)**\n\n` +
       `The **Senior Citizen ID** is officially issued free of charge by the **Office for Senior Citizens Affairs (OSCA)** in your City or Municipal Hall to all Filipino citizens aged 60 years old and above.\n\n` +
@@ -577,7 +826,7 @@ function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
     return answer;
   }
 
-  // 5. GENERAL / EXPLANATORY INQUIRY (Natural contextual response answering the user's specific topic)
+  // 6. GENERAL / EXPLANATORY INQUIRY
   let generalAnswer = `**${title}** (${agency})\n\n${desc}\n\n`;
 
   if (benefits.length > 0) {
@@ -598,22 +847,110 @@ function synthesizeDynamicAnswer(cleanQ, chunk, userDocs = [], user = {}) {
 export function generateAutonomousGroundedAnswer(cleanQ, options = {}) {
   const { opp, user, opportunities = [], userDocs = [] } = options;
   const firstName = user?.firstName || 'Citizen';
+  const q = normalizeText(cleanQ);
 
   // 1. If an opportunity was explicitly passed in context, synthesize directly from it
   if (opp) {
     return synthesizeDynamicAnswer(cleanQ, { ...opp, sourceUrl: opp.officialSource?.url, rawItem: opp }, userDocs, user);
   }
 
-  // 2. Dynamically retrieve the highest scoring scraped knowledge chunks across all government agencies
+  // 2. Student Benefits & Scholarships
+  if (q.includes('student') || q.includes('estudyante') || q.includes('school') || q.includes('scholarship') || q.includes('tuition')) {
+    const studentOpps = opportunities.filter((o) => {
+      const t = normalizeText(`${o.title} ${o.category} ${o.categoryName} ${o.agency} ${o.shortDesc}`);
+      return t.includes('student') || t.includes('tertiary') || t.includes('unifast') || t.includes('ched') || t.includes('spes') || t.includes('education');
+    });
+
+    let result = `Filipino students are entitled to key statutory benefits, tuition subsidies, and discounts under Philippine law:\n\n` +
+      `1. Mandatory 20% Fare Discount (RA 11314 - Student Fare Discount Act):\n` +
+      `• 20% discount on all domestic public transportation: Jeepneys, Buses, UV Express, MRT/LRT, Ferries, and Domestic Airline flights.\n` +
+      `• Valid every day including weekends and holidays upon presentation of a valid School ID.\n\n` +
+      `2. Free Higher Education (RA 10931):\n` +
+      `• 100% Free Tuition and miscellaneous school fees in all State Universities and Colleges (SUCs) and Local Universities and Colleges (LUCs).\n\n` +
+      `3. CHED & UniFAST Tertiary Education Subsidy (TES / Tulong Dunong):\n` +
+      `• Cash allowance of ₱20,000 to ₱40,000 per academic year for books, living allowance, and education expenses.\n` +
+      `• Apply through your college Registrar or Student Affairs Office (SFAO) and at https://unifast.gov.ph.\n\n` +
+      `4. DOLE SPES Student Bridging Employment:\n` +
+      `• Temporary paid wage employment during summer/semestral breaks with 40% government educational voucher subsidy.\n` +
+      `• Apply at your local Public Employment Service Office (PESO).\n\n` +
+      `5. Republic Act 11261 (First-Time Jobseekers Act):\n` +
+      `• Free issuance of Barangay Clearance, NBI Clearance, Police Clearance, and Medical Certificates for graduating students applying for their first job.`;
+
+    if (studentOpps.length > 0) {
+      result += `\n\nMatched Verified Scraped Programs:\n` +
+        studentOpps.slice(0, 3).map((o) => `• ${o.title} (${o.agency}): ${(o.benefits || []).join(', ') || o.shortDesc}`).join('\n');
+    }
+
+    return result;
+  }
+
+  // 3. Senior Citizen Benefits (RA 9994 & RA 10645)
+  if (q.includes('senior') || q.includes('elderly') || q.includes('osca') || q.includes('pension')) {
+    return (
+      `Filipino Senior Citizens (Age 60+) are entitled to comprehensive statutory benefits under RA 9994 and RA 10645:\n\n` +
+      `1. 20% Statutory Discount & 12% VAT Exemption:\n` +
+      `• All prescription medicines, vitamins, and medical/dental supplies\n` +
+      `• Professional fees of attending physicians in all private clinics and hospitals\n` +
+      `• Public transportation fares (Jeepney, Bus, MRT, LRT, Taxis, Domestic Flights, Ships)\n` +
+      `• Hotels, restaurants, recreation centers, movie theaters, and funeral services\n` +
+      `• 5% special grocery discount on basic necessities and prime commodities\n\n` +
+      `2. 100% Free Mandatory PhilHealth Coverage (RA 10645):\n` +
+      `• Automatic subsidized PhilHealth membership with Zero-Balance Billing in public hospital wards\n\n` +
+      `3. DSWD Social Pension for Indigent Senior Citizens (SPISC):\n` +
+      `• ₱1,000 monthly cash stipend for seniors without regular pension or income (apply at OSCA)\n\n` +
+      `4. Centenarian Cash Gift (RA 10868 / RA 11982):\n` +
+      `• ₱10,000 milestone cash gifts at ages 80, 85, 90, and 95, and ₱100,000 at age 100.\n\n` +
+      `Official Agency: City/Municipal Office of Senior Citizens Affairs (OSCA) & https://www.philhealth.gov.ph`
+    );
+  }
+
+  // 4. Philippine Government Loans & Multi-Purpose Cash Assistance
+  if (q.includes('loan') || q.includes('borrow') || q.includes('pautang') || q.includes('utang') || q.includes('pera') || q.includes('cash')) {
+    return (
+      `Here are the official Philippine government loan programs available by member category:\n\n` +
+      `1. SSS Salary Loan (Employed / Self-Employed / OFW):\n` +
+      `• Amount: 1 to 2 months average basic salary credit\n` +
+      `• Interest: 10% annual interest rate computed on diminishing balance\n` +
+      `• Terms: 24 equal monthly installments with direct bank or e-wallet disbursement\n` +
+      `• Portal: https://www.sss.gov.ph\n\n` +
+      `2. SSS Calamity Loan Assistance Program (CLAP):\n` +
+      `• 7% interest per annum for declared calamity areas with 24-month payment terms\n\n` +
+      `3. Pag-IBIG Multi-Purpose Cash Loan (HDMF MPL):\n` +
+      `• Loan up to 80% of your accumulated Total Accumulated Value (TAV)\n` +
+      `• Terms: 10.5% p.a. interest, 24 to 36 month repayment period via Virtual Pag-IBIG (https://www.pagibigfund.gov.ph)\n\n` +
+      `4. DSWD AICS Emergency Cash Assistance (Non-Repayable Grant):\n` +
+      `• ₱3,000 to ₱10,000 outright cash grant for emergency food, medicine, or family crisis support (apply at DSWD Field Office/CSWDO).\n\n` +
+      `Anti-Scam Reminder: Official government loans and subsidies are processed exclusively via .gov.ph portals and branch offices. Never pay upfront processing fees.`
+    );
+  }
+
+  // 5. Medical & Hospital Financial Assistance
+  if (q.includes('hospital') || q.includes('medical') || q.includes('malasakit') || q.includes('doh') || q.includes('bill') || q.includes('gamot')) {
+    return (
+      `Assistance for Hospital Bills & Healthcare in the Philippines:\n\n` +
+      `1. Malasakit Centers (One-Stop Action Desk):\n` +
+      `• Located inside all DOH-run and accredited public hospitals nationwide.\n` +
+      `• Coordinates assistance from PhilHealth, PCSO, DSWD, and DOH Medical Assistance for Indigent Patients (MAP).\n\n` +
+      `2. PhilHealth Universal Health Care:\n` +
+      `• Direct deduction from hospital bill and Zero-Balance Billing in public hospital basic ward beds.\n\n` +
+      `3. DOH Medical Assistance for Indigent Patients (MAP):\n` +
+      `• Guarantee Letters (GL) covering surgical supplies, laboratories, MRI/CT scans, dialysis, and medicines.\n\n` +
+      `4. PCSO Individual Medical Assistance Program (IMAP):\n` +
+      `• Cash vouchers and Guarantee Letters for hospitalization, chemotherapy, and specialty procedures.\n\n` +
+      `Requirements to Bring: Clinical Abstract / Medical Certificate, Statement of Account (SOA) with hospital stamp, Barangay Certificate of Indigency, and Valid Photo ID.`
+    );
+  }
+
+  // 6. Dynamically retrieve the highest scoring scraped knowledge chunks across all government agencies
   const chunks = retrieveRelevantKnowledgeChunks(cleanQ, { opportunities, opp, userDocs });
 
-  // 3. If relevant scraped chunks are found, synthesize a custom, tailored response answering the query
+  // 7. If relevant scraped chunks are found, synthesize a custom, tailored response
   if (chunks.length > 0) {
     const topChunk = chunks[0];
     return synthesizeDynamicAnswer(cleanQ, topChunk, userDocs, user);
   }
 
-  // 4. Default Fallback if no specific chunk matched
+  // 8. Default Fallback
   return (
     `ALALAY Autonomous Citizen Navigator & Step-by-Step Guide:\n\n` +
     `Hello ${firstName}! I am your autonomous AI government assistant grounded in official Philippine Citizen's Charters, scraped agency websites, and statutory circulars.\n\n` +
@@ -627,23 +964,43 @@ export function generateAutonomousGroundedAnswer(cleanQ, options = {}) {
   );
 }
 
+export const generateStructuredGroundedAnswer = generateAutonomousGroundedAnswer;
+
 /**
- * Autonomous Ask Alalay AI Engine with Flash 3.6 & Live Scraped Web Grounding
+ * Ask ALALAY AI Engine with Secure Backend Proxy, Dual-Key Failover, and Live Scraped Grounding
  */
 export async function askAlalayAI(userQuestion, options = {}) {
-  const cleanQ = (userQuestion || '').trim().toLowerCase();
-  const contextOptions = typeof options === 'string' ? { contextType: options } : options;
+  const originalQuestion = String(userQuestion || '').trim();
+  if (!originalQuestion) return 'Please enter a question so I can help you.';
 
-  // 1. Build comprehensive dynamic RAG context from all scraped government websites & database
-  const ragContext = buildGroundingContext(userQuestion, contextOptions);
+  const contextOptions = typeof options === 'string' ? { contextType: options } : options;
+  const {
+    opportunities = [],
+    sources = [],
+    opp = null,
+    user = null,
+    userDocs = [],
+    conversationHistory = [],
+  } = contextOptions;
+
+  const plan = analyzeQuestion(originalQuestion, conversationHistory);
+  const ragContext = buildGroundingContext(originalQuestion, contextOptions);
+
+  const historyText = Array.isArray(conversationHistory) && conversationHistory.length
+    ? conversationHistory.slice(-6).map((m, i) => {
+      const role = m?.role || (i % 2 === 0 ? 'user' : 'assistant');
+      const text = typeof m === 'string' ? m : (m?.content || m?.text || '');
+      return `${role}: ${text}`;
+    }).join('\n')
+    : 'No previous conversation provided.';
 
   const systemPrompt =
-    'You are ALALAY, an autonomous, highly intelligent, and authoritative Philippine Government AI Assistant and Citizen Charter Navigator.\n' +
+    'You are ALALAY, an autonomous, highly intelligent, and authoritative Philippine Government AI Assistant and Citizen Charter Navigator.\n\n' +
     'CRITICAL AGENCY INTEGRITY RULES:\n' +
     '- Senior Citizen OSCA ID & 20% + 12% VAT Discounts: Handled by City/Municipal OSCA (Office for Senior Citizens Affairs) and NCSC (ncsc.gov.ph), NOT SSS.\n' +
     '- Mandatory Healthcare & Zero-Balance Billing: Handled by PhilHealth (philhealth.gov.ph) and DOH Malasakit Centers (doh.gov.ph).\n' +
     '- Social Pension for Indigent Seniors: Handled by DSWD (dswd.gov.ph).\n' +
-    '- Social Security Salary & Calamity Loans: Handled by SSS (sss.gov.ph).\n' +
+    '- Social Security Salary & Calamity Loans: Handled by SSS (sss.gov.ph).\n\n' +
     'RESPONSE FORMAT RULE: Whenever the citizen asks how or where to get, apply for, renew, claim, or process ANY government document or benefit ' +
     '(this includes phrasings like "how to get X", "where to get X", "paano kumuha ng X", not only the literal word "procedure"), ' +
     'you MUST include a "Prerequisites & Required Credentials:" section followed by a "Step-by-Step Procedure:" section — these are two SEPARATE ' +
@@ -661,90 +1018,121 @@ export async function askAlalayAI(userQuestion, options = {}) {
     'in addition to English. Keep proper nouns, statute citations (e.g. "RA 9994"), agency names, and official document names in their original form ' +
     'even when the surrounding sentence is in a dialect. If the inquiry is in a language that is NOT English or a Philippine dialect, reply in English. ' +
     'Never mix dialects within a single response, and never refuse to answer solely because the citizen wrote in a dialect other than English or Filipino.\n\n' +
+    'QUESTION UNDERSTANDING RULES:\n' +
+    '1. Identify the SUBJECT separately from the INTENT.\n' +
+    '2. The subject is the government program, loan, benefit, document, agency, or service.\n' +
+    '3. The intent is what the citizen wants to know: available options, requirements, eligibility, application steps, location, benefits, fees, processing time, documents, or general information.\n' +
+    '4. If the citizen asks "what loans are applicable for students", answer which loan/program options are applicable. Do NOT turn the answer into a requirements list unless requirements are explicitly requested.\n' +
+    '5. If the citizen asks "what are the requirements for the student loan", answer the requirements/documents for the relevant loan. Do NOT repeat the previous list of loans.\n' +
+    '6. If the citizen asks a follow-up such as "what are the requirements for it?" or "where can I apply for it?", use recent conversation history to resolve "it".\n' +
+    '7. Answer the exact question first. Use bullet points (•) for requirements, options, or lists. No markdown asterisks headers.\n\n' +
     getDictionaryContext() +
     ragContext;
 
-  // 2. Check for Gemini API key
-  const apiKey = getApiKey();
+  const userInstruction =
+    `RECENT CONVERSATION (use only when needed to resolve follow-ups):\n${historyText}\n\n` +
+    `CURRENT CITIZEN QUESTION:\n${originalQuestion}\n\n` +
+    `LOCAL QUESTION PLAN (hint):\n` +
+    `- Intent: ${plan.intent}\n` +
+    `- Topic: ${plan.topicKeywords.join(', ') || 'general'}\n` +
+    `- Follow-up: ${plan.isFollowUp ? 'yes' : 'no'}\n\n` +
+    'Instructions: Answer the CURRENT CITIZEN QUESTION directly and concisely based on the verified context above. If the citizen is asking how/where to get, apply for, or process something, structure the answer as numbered steps (Step 1, Step 2...) — do not just describe the agency. If the inquiry is unrelated to Philippine government services, decline per the SCOPE GUARDRAIL.';
 
-  // If no API key, use autonomous local grounded reasoning engine
-  if (!apiKey) {
-    return generateAutonomousGroundedAnswer(cleanQ, contextOptions);
+  // 1. Preferred Route: Call secure backend proxy (zero credential exposure in browser)
+  try {
+    const backendRes = await fetch('/api/alalay/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt,
+        userInstruction,
+        temperature: 0.1,
+        maxOutputTokens: 1500,
+      }),
+    });
+
+    if (backendRes.ok) {
+      const backendData = await backendRes.json();
+      if (backendData.success && backendData.text && backendData.text.trim().length > 10) {
+        return cleanMarkdownText(backendData.text);
+      }
+    }
+  } catch {
+    // Backend proxy unavailable, continue to client direct API fallback
   }
 
-  // Prioritized model sequence: Flash 3.6 as main model
-  const models = [
-    'gemini-3.6-flash',
-    'gemini-2.5-flash',
-    'gemini-1.5-flash',
-    'gemini-2.0-flash',
-    'gemini-1.5-pro'
-  ];
+  // 2. Direct client fallback if API key is configured
+  let apiKey = getApiKey();
+  if (apiKey) {
+    const models = [
+      'gemini-3.6-flash',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-3.7-flash',
+      'gemini-1.5-pro',
+    ];
 
-  await limiter.acquireSlot();
+    for (const model of models) {
+      try {
+        await limiter.acquireSlot();
+        const isOAuth = apiKey.startsWith('ya29.');
+        const isApiKey = apiKey.startsWith('AIza');
+        const url = isApiKey
+          ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+          : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
-  for (const model of models) {
-    try {
-      const isApiKey = apiKey.startsWith('AIza');
-      const url = isApiKey
-        ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-        : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const headers = { 'Content-Type': 'application/json' };
+        if (isOAuth) {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        } else if (isApiKey) {
+          headers['x-goog-api-key'] = apiKey;
+        } else {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        }
 
-      const headers = {
-        'Content-Type': 'application/json',
-      };
-
-      if (!isApiKey) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      } else {
-        headers['x-goog-api-key'] = apiKey;
-      }
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  text: `${systemPrompt}\n\nCitizen Inquiry: "${userQuestion}"\n\nInstructions: Answer the inquiry directly and concisely based on the scraped context above. If the citizen is asking how/where to get, apply for, or process something, structure the answer as numbered steps (Step 1, Step 2...) — do not just describe the agency. If the inquiry is unrelated to Philippine government services, decline per the SCOPE GUARDRAIL instead of answering it.`,
-                },
-              ],
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `${systemPrompt}\n\n${userInstruction}` }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1500,
             },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 1500,
-          },
-        }),
-      });
+          }),
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        const candidate = data.candidates?.[0];
-        const rawText = candidate?.content?.parts?.[0]?.text;
-
-        if (rawText && rawText.trim().length > 15) {
-          return cleanMarkdownText(rawText);
+        if (response.ok) {
+          const data = await response.json();
+          const rawText =
+            data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+          if (rawText.trim().length > 15) {
+            return cleanMarkdownText(rawText);
+          }
+        } else {
+          const errStatus = response.status;
+          if (errStatus === 401) {
+            console.warn('[GeminiService] API Key unauthorized. Falling back to autonomous grounded engine.');
+            break;
+          }
+          if (errStatus === 429) {
+            if (switchKeyToReserveIfAvailable('Rate limit (429)')) {
+              apiKey = getApiKey();
+            }
+          }
         }
-      } else {
-        const errStatus = response.status;
-        if (errStatus === 401) {
-          console.warn('[GeminiService] API Key is unauthorized or unsupported token type. Falling back to autonomous grounded engine.');
-          break; // Stop attempting other models with the unauthorized key
-        }
-        if (errStatus === 429) {
-          switchKeyToReserveIfAvailable('Rate Limited (429)');
-          break;
-        }
+      } catch {
+        // Try next model
       }
-    } catch (err) {
-      // Continue or fallback
     }
   }
 
-  // Fallback to autonomous local grounded reasoning engine
-  return generateAutonomousGroundedAnswer(cleanQ, contextOptions);
+  // 3. Fallback to autonomous local grounded reasoning engine
+  return generateAutonomousGroundedAnswer(originalQuestion, { ...contextOptions, userDocs, opportunities });
 }

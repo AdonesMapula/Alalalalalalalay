@@ -161,6 +161,7 @@ Ask me anything below or select a recommended topic from the sidebar.`,
         opportunities,
         sources,
         userDocs: documents,
+        conversationHistory: messages,
       });
 
       // Filter matched opportunities

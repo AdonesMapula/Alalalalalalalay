@@ -1719,6 +1719,35 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  const updateDocument = (docId, updatedFields = {}, { silent = false } = {}) => {
+    setDocuments((prev) => {
+      const updated = prev.map((doc) => {
+        if (doc.id === docId) {
+          return {
+            ...doc,
+            ...updatedFields,
+            attributes: {
+              ...(doc.attributes || {}),
+              ...(updatedFields.attributes || {}),
+            },
+            applicationData: {
+              ...(doc.applicationData || {}),
+              ...(updatedFields.applicationData || {}),
+            },
+            uploadedAt: updatedFields.uploadedAt || 'Updated just now',
+          };
+        }
+        return doc;
+      });
+      localStorage.setItem('alalay_documents', JSON.stringify(updated));
+      return updated;
+    });
+
+    if (!silent) {
+      addToast('Document Updated', 'Your changes have been saved to your digital vault.', 'success');
+    }
+  };
+
   const replaceDocument = (docId, updatedFields = {}) => {
     setDocuments((prev) => {
       const updated = prev.map((doc) => {
@@ -1809,6 +1838,7 @@ export const AppProvider = ({ children }) => {
         documents,
         setDocuments,
         uploadNewDocument,
+        updateDocument,
         replaceDocument,
         deleteDocument,
         pinnedOpportunityIds,
