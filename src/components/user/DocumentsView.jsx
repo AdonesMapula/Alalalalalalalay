@@ -27,7 +27,7 @@ import { IOSButton } from '../common/IOSButton';
 import { IOSBadge } from '../common/IOSBadge';
 import { IOSSegmentedControl } from '../common/IOSSegmentedControl';
 import { IOSSheet } from '../common/IOSSheet';
-import { auditVaultDocuments, calculateOpportunityDocumentGaps } from '../../services/docAgentService';
+import { auditVaultDocuments, calculateOpportunityDocumentGaps, getDocumentPlaceholderThumbnail } from '../../services/docAgentService';
 import { DocAgentRenewalModal } from './DocAgentRenewalModal';
 
 export const DocumentsView = () => {
@@ -387,8 +387,9 @@ export const DocumentsView = () => {
                   className="h-28 rounded-2xl bg-slate-100 border border-slate-200/80 overflow-hidden relative group/thumb cursor-pointer flex items-center justify-center"
                 >
                   <img
-                    src={doc.thumbnail || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80'}
+                    src={doc.thumbnail || getDocumentPlaceholderThumbnail(doc.type)}
                     alt={doc.name}
+                    onError={(e) => { e.currentTarget.src = getDocumentPlaceholderThumbnail(doc.type); }}
                     className="w-full h-full object-cover group-hover/thumb:scale-105 transition-all"
                   />
                   <div className="absolute inset-0 bg-black/30 backdrop-blur-[2px] opacity-0 group-hover/thumb:opacity-100 transition-all flex items-center justify-center text-white gap-1.5 text-xs font-bold">
@@ -503,8 +504,9 @@ export const DocumentsView = () => {
             {/* Thumbnail Preview */}
             <div className="h-48 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden">
               <img
-                src={activeDocumentForPreview.thumbnail || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&auto=format&fit=crop&q=80'}
+                src={activeDocumentForPreview.thumbnail || getDocumentPlaceholderThumbnail(activeDocumentForPreview.type)}
                 alt={activeDocumentForPreview.name}
+                onError={(e) => { e.currentTarget.src = getDocumentPlaceholderThumbnail(activeDocumentForPreview.type); }}
                 className="w-full h-full object-cover"
               />
             </div>

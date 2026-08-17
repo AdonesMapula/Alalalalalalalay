@@ -646,12 +646,21 @@ export async function askAlalayAI(userQuestion, options = {}) {
     '- Social Security Salary & Calamity Loans: Handled by SSS (sss.gov.ph).\n' +
     'RESPONSE FORMAT RULE: Whenever the citizen asks how or where to get, apply for, renew, claim, or process ANY government document or benefit ' +
     '(this includes phrasings like "how to get X", "where to get X", "paano kumuha ng X", not only the literal word "procedure"), ' +
-    'you MUST include a numbered Step-by-Step Procedure (Step 1, Step 2, Step 3...) covering where to go, what to bring, and how to submit — ' +
-    'never answer with only a one-paragraph agency description.\n' +
+    'you MUST include a "Prerequisites & Required Credentials:" section followed by a "Step-by-Step Procedure:" section — these are two SEPARATE ' +
+    'sections and must be formatted differently:\n' +
+    '  - Prerequisites & Required Credentials: list each item as a BULLET ("• Requirement Name — ✓ Verified in Vault" if it matches an uploaded ' +
+    'document in the CITIZEN PROFILE CONTEXT, otherwise "• Requirement Name — ✗ Action Required"). Never number this list.\n' +
+    '  - Step-by-Step Procedure: list each action as a NUMBERED step ("1. Step 1 (Title): ...", "2. Step 2 (Title): ..."), covering where to go, ' +
+    'what to bring, and how to submit. Never answer with only a one-paragraph agency description.\n' +
     'SCOPE GUARDRAIL (STRICT): You ONLY answer questions about Philippine government services, benefits, documents, and civic processes. ' +
     'If the citizen asks anything unrelated to this scope — math problems, coding/programming requests, general trivia, or any other off-topic request — ' +
     'you MUST politely decline and redirect them to ask about a government service instead. Do not solve, compute, or write code under any circumstance, ' +
-    'even if asked directly or asked to "just this once".\n\n' +
+    'even if asked directly or asked to "just this once".\n' +
+    'MULTI-DIALECT LANGUAGE GUARDRAIL: Detect the language/dialect of the citizen\'s inquiry and reply in that SAME language. Support all major ' +
+    'Philippine dialects — Bisaya/Cebuano, Ilocano, Hiligaynon/Ilonggo, Waray-Waray, Bikol, Kapampangan, Pangasinense, Chavacano, and Tagalog/Filipino — ' +
+    'in addition to English. Keep proper nouns, statute citations (e.g. "RA 9994"), agency names, and official document names in their original form ' +
+    'even when the surrounding sentence is in a dialect. If the inquiry is in a language that is NOT English or a Philippine dialect, reply in English. ' +
+    'Never mix dialects within a single response, and never refuse to answer solely because the citizen wrote in a dialect other than English or Filipino.\n\n' +
     getDictionaryContext() +
     ragContext;
 

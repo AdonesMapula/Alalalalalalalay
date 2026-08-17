@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   LogOut,
   Sparkles,
+  Award,
 } from 'lucide-react';
 import { AlalayLogo } from '../common/AlalayLogo';
 import { useApp } from '../../context/AppContext';
@@ -33,6 +34,7 @@ export const Sidebar = () => {
     { id: 'explore', label: t('nav.explore'), icon: Compass },
     { id: 'ai-chat', label: t('nav.aiChat'), icon: Sparkles },
     { id: 'documents', label: t('nav.documents'), icon: FileText },
+    { id: 'benefits', label: t('nav.benefits'), icon: Award },
     { id: 'chat-history', label: t('nav.chatArchives'), icon: MessageSquare },
     { id: 'profile', label: t('nav.profile'), icon: User },
   ];

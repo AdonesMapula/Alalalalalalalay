@@ -52,6 +52,10 @@ function parseAiContent(text = '', sourceUrl = '') {
   const blocks = [];
   let currentBullets = [];
   let currentSteps = [];
+  // Tracks the most recent heading so a numbered "Prerequisites" list (e.g. AI output
+  // that numbers requirements instead of bulleting them) still renders as the distinct
+  // checklist section rather than being mistaken for the numbered procedure stepper.
+  let currentSectionIsPrerequisites = false;
 
   const flushBullets = () => {
     if (currentBullets.length > 0) {
@@ -87,6 +91,14 @@ function parseAiContent(text = '', sourceUrl = '') {
     // Step Match: 1. Step 1 (Title): ..., 1. Step 1: ..., 1. Title: ..., or 1. Content...
     const stepMatch = raw.match(/^(\d+)[\.\)]\s*(?:(?:Step\s*\d+|STEP\s*\d+)\s*[:\-\(]?\s*([^:\)]+)?[\):\-]?\s*)?(.*)/i);
     const isExplicitStepLine = /^(?:Step\s*\d+|\d+\.\s*Step|\d+\.)/i.test(raw);
+
+    // A numbered line inside a "Prerequisites / Required Documents" section is a
+    // requirement, not a procedure step — render it in the checklist, not the stepper.
+    if (isExplicitStepLine && currentSectionIsPrerequisites) {
+      flushSteps();
+      currentBullets.push(raw.replace(/^\d+[\.\)]\s*/, ''));
+      continue;
+    }
 
     if (isExplicitStepLine && stepMatch) {
       flushBullets();
@@ -132,10 +144,14 @@ function parseAiContent(text = '', sourceUrl = '') {
         type: 'source',
         content: raw,
       });
-    } else if (raw.startsWith('###') || raw.startsWith('##') || (raw.endsWith(':') && raw.length < 80)) {
+    } else if (raw.startsWith('###') || raw.startsWith('##') || (/:\*{0,2}$/.test(raw) && raw.length < 80)) {
+      // Trailing colon may be wrapped in markdown bold (e.g. "**Prerequisites:**"), so
+      // strip both before testing/storing so heading detection isn't markdown-fragile.
+      const headingText = raw.replace(/^#+\s*/, '').replace(/\*+/g, '').replace(/\:$/, '');
+      currentSectionIsPrerequisites = /prerequisite|required (document|credential)/i.test(headingText);
       blocks.push({
         type: 'heading',
-        content: raw.replace(/^#+\s*/, '').replace(/\:$/, ''),
+        content: headingText,
       });
     } else {
       blocks.push({

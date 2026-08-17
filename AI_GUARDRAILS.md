@@ -12,7 +12,7 @@ All financial calculations, statutory qualification logic, and citizen privacy b
 
 ---
 
-## 2. The 8 Layers of ALALAY AI Guardrails
+## 2. The 9 Layers of ALALAY AI Guardrails
 
 ```mermaid
 graph TD
@@ -33,6 +33,7 @@ graph TD
         RATE_LIMIT["Layer 6: Sliding Window Rate Limiter - 10 RPM and 1500ms Delay"]
         FAILOVER["Layer 5: Dual-Key Automatic Failover - Primary and Reserve Key"]
         OUTPUT_CLEAN["Layer 7: Output Sanitization - Tag Cleaning and ₱ Currency Formatting"]
+        LANG_MIRROR["Layer 9: Multi-Dialect Language Mirroring"]
         GEMINI["Google Gemini Generative API"]
     end
 
@@ -44,7 +45,7 @@ graph TD
     RAG_CHARTER --> CLINICAL_GUARD
     RAG_LOCKER --> CLINICAL_GUARD
     CLINICAL_GUARD --> RATE_LIMIT
-    RATE_LIMIT --> FAILOVER --> GEMINI --> OUTPUT_CLEAN
+    RATE_LIMIT --> FAILOVER --> LANG_MIRROR --> GEMINI --> OUTPUT_CLEAN
 ```
 
 ---
@@ -119,3 +120,10 @@ stateDiagram-v2
 ### Layer 8: Data Privacy & PII Boundary (RA 10173 DPA)
 - **Minimal Fact Transmission**: Prompts transmitted to Gemini contain zero direct Personal Identifiable Information (PII) such as full street addresses or raw government ID serial numbers.
 - **User-Isolated Storage**: Chat histories and documents are strictly isolated by `user_email` and `user_id` both in local cache and Supabase queries.
+
+### Layer 9: Multi-Dialect Language Mirroring
+- **Concept**: A citizen should never be forced into English or Filipino to get help — ALALAY detects the language the citizen actually wrote in and answers in kind.
+- **Implementation**: The `MULTI-DIALECT LANGUAGE GUARDRAIL` clause in the [`askAlalayAI`](./src/services/geminiService.js) system prompt instructs Gemini to detect and mirror Bisaya/Cebuano, Ilocano, Hiligaynon/Ilonggo, Waray-Waray, Bikol, Kapampangan, Pangasinense, Chavacano, and Tagalog/Filipino, in addition to English.
+- **Fallback Rule**: If the inquiry is in a language that is not English or a recognized Philippine dialect, ALALAY replies in English rather than guessing.
+- **Guardrail Rule**: Proper nouns, statute citations (e.g. "RA 9994"), agency names, and official document names are always kept in their original form regardless of the surrounding dialect, and a single response never mixes dialects.
+- **Known Limitation**: This mirroring applies to the live Gemini path only. The offline deterministic fallback engine (`generateAutonomousGroundedAnswer` in `geminiService.js`, used when no API key is configured) only has canned English/Filipino responses.

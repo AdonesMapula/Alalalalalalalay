@@ -25,6 +25,112 @@ export const STATUTORY_VALIDITY_DAYS = {
   'PWD Identification Card': 1825, // 5 years (NCDA Standard)
 };
 
+// Visual profile per document category, used to render a thumbnail that actually looks
+// like the document it represents (ID card, seal-stamped certificate, clearance, etc.)
+// instead of an unrelated stock photo.
+const DOCUMENT_VISUAL_PROFILES = [
+  {
+    match: (type) => /national id|gov id|identity card|osca|pwd identification/i.test(type),
+    label: 'GOVERNMENT ID',
+    kind: 'card',
+    from: '#093a96',
+    to: '#1e5fd9',
+  },
+  {
+    match: (type) => /barangay/i.test(type),
+    label: 'BARANGAY CERTIFICATE',
+    kind: 'seal',
+    from: '#0f766e',
+    to: '#14b8a6',
+  },
+  {
+    match: (type) => /nbi|police/i.test(type),
+    label: 'CLEARANCE',
+    kind: 'shield',
+    from: '#7c2d12',
+    to: '#c2410c',
+  },
+  {
+    match: (type) => /medical|clinical/i.test(type),
+    label: 'MEDICAL CERTIFICATE',
+    kind: 'cross',
+    from: '#be123c',
+    to: '#f43f5e',
+  },
+  {
+    match: (type) => /philhealth/i.test(type),
+    label: 'PHILHEALTH MDR',
+    kind: 'cross',
+    from: '#7e22ce',
+    to: '#a855f7',
+  },
+  {
+    match: (type) => /birth certificate|psa/i.test(type),
+    label: 'CERTIFICATE OF LIVE BIRTH',
+    kind: 'seal',
+    from: '#0e7490',
+    to: '#22d3ee',
+  },
+  {
+    match: (type) => /employment|coe|civil service/i.test(type),
+    label: 'CERTIFICATE OF EMPLOYMENT',
+    kind: 'briefcase',
+    from: '#334155',
+    to: '#64748b',
+  },
+  {
+    match: (type) => /school|registration|transcript/i.test(type),
+    label: 'CERTIFICATE OF REGISTRATION',
+    kind: 'cap',
+    from: '#a16207',
+    to: '#eab308',
+  },
+];
+
+const DEFAULT_VISUAL_PROFILE = {
+  label: 'GOVERNMENT DOCUMENT',
+  kind: 'document',
+  from: '#334155',
+  to: '#64748b',
+};
+
+// Small hand-drawn icon glyphs (kept minimal so they render crisply at thumbnail size)
+const VISUAL_ICON_PATHS = {
+  card: '<rect x="18" y="20" width="20" height="14" rx="2" fill="none" stroke="white" stroke-width="1.6"/><circle cx="23" cy="27" r="2.4" fill="white"/><rect x="28" y="24.5" width="7" height="1.4" rx="0.7" fill="white"/><rect x="28" y="27.5" width="7" height="1.4" rx="0.7" fill="white"/>',
+  seal: '<circle cx="28" cy="26" r="8" fill="none" stroke="white" stroke-width="1.6"/><path d="M28 21 L29.2 24.8 L33 24.8 L30 27.1 L31.1 31 L28 28.6 L24.9 31 L26 27.1 L23 24.8 L26.8 24.8 Z" fill="white"/>',
+  shield: '<path d="M28 18 L36 21 V27 C36 32 32.5 35.5 28 37 C23.5 35.5 20 32 20 27 V21 Z" fill="none" stroke="white" stroke-width="1.6"/><path d="M24.5 27 L27 29.5 L32 24" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  cross: '<rect x="25.5" y="19" width="5" height="16" rx="1.2" fill="white"/><rect x="20" y="24.5" width="16" height="5" rx="1.2" fill="white"/>',
+  briefcase: '<rect x="18" y="24" width="20" height="12" rx="1.5" fill="none" stroke="white" stroke-width="1.6"/><path d="M24 24 V21.5 C24 20.7 24.7 20 25.5 20 H30.5 C31.3 20 32 20.7 32 21.5 V24" fill="none" stroke="white" stroke-width="1.6"/>',
+  cap: '<path d="M28 19 L38 24 L28 29 L18 24 Z" fill="none" stroke="white" stroke-width="1.6" stroke-linejoin="round"/><path d="M22 26 V31 C22 32.5 24.7 34 28 34 C31.3 34 34 32.5 34 31 V26" fill="none" stroke="white" stroke-width="1.6"/>',
+  document: '<rect x="20" y="18" width="16" height="20" rx="1.5" fill="none" stroke="white" stroke-width="1.6"/><rect x="23" y="23" width="10" height="1.4" rx="0.7" fill="white"/><rect x="23" y="27" width="10" height="1.4" rx="0.7" fill="white"/><rect x="23" y="31" width="6" height="1.4" rx="0.7" fill="white"/>',
+};
+
+/**
+ * Builds a self-contained SVG placeholder thumbnail that visually matches the given
+ * document type (e.g. a card icon for a National ID, a seal for a certificate) instead
+ * of showing an unrelated stock photo.
+ */
+export function getDocumentPlaceholderThumbnail(type = '') {
+  const profile = DOCUMENT_VISUAL_PROFILES.find((p) => p.match(type)) || DEFAULT_VISUAL_PROFILE;
+  const icon = VISUAL_ICON_PATHS[profile.kind] || VISUAL_ICON_PATHS.document;
+  const label = profile.label;
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260" viewBox="0 0 400 260">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${profile.from}"/>
+        <stop offset="1" stop-color="${profile.to}"/>
+      </linearGradient>
+    </defs>
+    <rect width="400" height="260" fill="url(#g)"/>
+    <g transform="translate(150,30) scale(4.2)">${icon}</g>
+    <text x="200" y="220" text-anchor="middle" font-family="Arial, sans-serif" font-size="17" font-weight="700" fill="white" letter-spacing="0.5">${label}</text>
+    <text x="200" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="rgba(255,255,255,0.75)">Republika ng Pilipinas</text>
+  </svg>`;
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 // Document OCR Presets for instant realistic simulation
 export const OCR_PRESET_TEMPLATES = {
   philsys: {
@@ -33,7 +139,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Philippine Statistics Authority (PSA)',
     documentNumber: 'PH-CRN-9942-8810-7214',
     validityDays: 3650,
-    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('National ID / Gov ID'),
     attributes: {
       crn: 'PH-CRN-9942-8810-7214',
       fullName: 'Adones Mendoza Santos',
@@ -53,7 +159,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Office of the Punong Barangay - Brgy. Loyola Heights, QC',
     documentNumber: 'BRGY-IND-2026-0841',
     validityDays: 180,
-    thumbnail: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('Barangay Certificate'),
     attributes: {
       certificateNumber: 'BRGY-IND-2026-0841',
       barangay: 'Loyola Heights',
@@ -72,7 +178,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'National Bureau of Investigation (NBI)',
     documentNumber: 'NBI-CLEAR-8839-4410',
     validityDays: 365,
-    thumbnail: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('NBI Clearance'),
     attributes: {
       nbiId: 'NBI-CLEAR-8839-4410',
       statusRemarks: 'NO DEROGATORY RECORD / CLEAN',
@@ -88,7 +194,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Quezon City General Hospital - Department of Internal Medicine',
     documentNumber: 'QCGH-MED-9941',
     validityDays: 90,
-    thumbnail: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('Medical Certificate / Clinical Abstract'),
     attributes: {
       hospital: 'Quezon City General Hospital',
       physician: 'Dr. Roberto G. Cruz, MD (PRC #0084920)',
@@ -104,7 +210,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Philippine Statistics Authority (PSA)',
     documentNumber: 'PSA-COLB-1992-0418-88',
     validityDays: 36500,
-    thumbnail: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('Birth Certificate (PSA)'),
     attributes: {
       registryNumber: '92-0418-QC',
       motherMaidenName: 'Corazon Mendoza',
@@ -122,7 +228,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Office for Senior Citizens Affairs (OSCA) - Quezon City',
     documentNumber: 'OSCA-QC-2026-05512',
     validityDays: 3650,
-    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('National ID / Gov ID'),
     attributes: {
       oscaId: 'OSCA-QC-2026-05512',
       fullName: 'Adones Mendoza Santos',
@@ -140,7 +246,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'National Council on Disability Affairs (NCDA) / City PDAO',
     documentNumber: 'PWD-QC-2026-11209',
     validityDays: 1825,
-    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('National ID / Gov ID'),
     attributes: {
       pwdId: 'PWD-QC-2026-11209',
       disabilityType: 'Orthopedic / Physical Disability',
@@ -155,7 +261,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Philippine Health Insurance Corporation (PhilHealth)',
     documentNumber: 'PHIC-PIN-0219-8841-2207',
     validityDays: 365,
-    thumbnail: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('PhilHealth MDR'),
     attributes: {
       philhealthPin: 'PHIC-PIN-0219-8841-2207',
       memberStatus: 'Active / Contributing Member',
@@ -170,7 +276,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Philippine National Police (PNP) Clearance System',
     documentNumber: 'PNP-CLR-2026-77340',
     validityDays: 180,
-    thumbnail: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('Police Clearance'),
     attributes: {
       pnpReferenceNo: 'PNP-CLR-2026-77340',
       statusRemarks: 'NO DEROGATORY RECORD / CLEAN',
@@ -185,7 +291,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Human Resources Department, Private Employer',
     documentNumber: 'COE-2026-40218',
     validityDays: 180,
-    thumbnail: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('Certificate of Employment (COE)'),
     attributes: {
       position: 'Rank-and-File Employee',
       employmentStatus: 'Regular / Full-Time',
@@ -200,7 +306,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Office of the University Registrar',
     documentNumber: 'COR-AY2026-2027-08841',
     validityDays: 120,
-    thumbnail: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('School Registration / Transcript'),
     attributes: {
       schoolYear: 'AY 2026-2027, 1st Semester',
       yearLevel: '2nd Year',
@@ -217,7 +323,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Civil Service Commission (CSC)',
     documentNumber: 'CSC-PDS-2026-33017',
     validityDays: 180,
-    thumbnail: 'https://images.unsplash.com/photo-1568667256549-094345857637?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('Certificate of Employment (COE)'),
     attributes: {
       formVersion: 'CS Form No. 212 (Revised 2017)',
       applicantStatus: 'Duly Accomplished & Signed',
@@ -232,7 +338,7 @@ export const OCR_PRESET_TEMPLATES = {
     issuer: 'Civil Service Commission (CSC)',
     documentNumber: 'CSC-ELIG-2026-90142',
     validityDays: 36500,
-    thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+    thumbnail: getDocumentPlaceholderThumbnail('Certificate of Employment (COE)'),
     attributes: {
       eligibilityLevel: 'Professional (Career Service)',
       examDate: '2024-10-06',
@@ -291,6 +397,11 @@ export async function scanAndExtractDocumentMetadata(fileOrName, customFields = 
   const expDateObj = new Date(issuedDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
   const calculatedExpiration = expDateObj.toISOString().split('T')[0];
 
+  // A real uploaded image/PDF is the actual document the citizen scanned — always prefer
+  // showing that over the generic type-based placeholder used for quick-test presets.
+  const isRealFile = typeof File !== 'undefined' && fileOrName instanceof File && fileOrName.type?.startsWith('image/');
+  const thumbnail = isRealFile ? URL.createObjectURL(fileOrName) : template.thumbnail;
+
   return {
     name: customFields.name || template.name,
     type: customFields.type || template.type,
@@ -300,7 +411,7 @@ export async function scanAndExtractDocumentMetadata(fileOrName, customFields = 
     attributes: { ...template.attributes, ...(customFields.attributes || {}) },
     confidenceScore: template.confidenceScore,
     textClarity: template.textClarity,
-    thumbnail: template.thumbnail,
+    thumbnail,
     status: 'Valid',
     scannedAt: new Date().toISOString(),
   };

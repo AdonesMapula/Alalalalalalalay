@@ -18,7 +18,7 @@ import {
 import { useApp } from '../../context/AppContext';
 import { IOSSheet } from '../common/IOSSheet';
 import { IOSButton } from '../common/IOSButton';
-import { scanAndExtractDocumentMetadata, OCR_PRESET_TEMPLATES } from '../../services/docAgentService';
+import { scanAndExtractDocumentMetadata, OCR_PRESET_TEMPLATES, getDocumentPlaceholderThumbnail } from '../../services/docAgentService';
 
 export const DocumentUploadModal = () => {
   const {
@@ -135,7 +135,7 @@ export const DocumentUploadModal = () => {
           issuer: issuer || 'Authorized Government Agency',
           documentNumber: docNumber || `DOC-${Math.floor(100000 + Math.random() * 900000)}`,
           expirationDate: expirationDate || '2028-12-31',
-          thumbnail: ocrResult?.thumbnail || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+          thumbnail: ocrResult?.thumbnail || getDocumentPlaceholderThumbnail(docType),
           attributes: ocrResult?.attributes || {},
         });
       }

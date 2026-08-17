@@ -30,7 +30,7 @@ import {
 import { runFacebookSyncPipeline } from '../services/facebookScraper';
 import { scrapeAnyWebsite } from '../services/webScraper';
 import { rankAndFilterOpportunities, getAutoApplyMatches } from '../services/rulesEngine';
-import { OCR_PRESET_TEMPLATES } from '../services/docAgentService';
+import { OCR_PRESET_TEMPLATES, getDocumentPlaceholderThumbnail } from '../services/docAgentService';
 import { translate } from '../lib/translations';
 import {
   INITIAL_USER,
@@ -107,11 +107,10 @@ function dedupeOpportunitiesByTitle(list = []) {
 }
 
 export const AppProvider = ({ children }) => {
-  // Navigation & View Mode
-  const [viewMode, setViewMode] = useState(() => {
-    const saved = localStorage.getItem('alalay_view_mode');
-    return saved || 'user';
-  });
+  // Navigation & View Mode. Deliberately NOT restored from localStorage: admin view must
+  // only ever be entered fresh each load (via the /admin portal route or an admin login),
+  // never regained by simply refreshing a page that happened to be in admin mode before.
+  const [viewMode, setViewMode] = useState('user');
   const [activeTab, setActiveTab] = useState('home');
   const [adminTab, setAdminTab] = useState('sources');
 
@@ -203,9 +202,6 @@ export const AppProvider = ({ children }) => {
     }
   }, [user]);
 
-  useEffect(() => {
-    localStorage.setItem('alalay_view_mode', viewMode);
-  }, [viewMode]);
 
   const [opportunities, setOpportunities] = useState(() => {
     const saved = localStorage.getItem('alalay_opportunities');
@@ -307,8 +303,24 @@ export const AppProvider = ({ children }) => {
     setAutoApplyQueue((prev) => prev.filter((entry) => entry.oppId !== oppId));
   };
 
+  // Citizen-confirmed receipt of a benefit — distinct from "applied" (submitted) since a
+  // submitted application isn't the same as the benefit actually being granted/received.
+  const markBenefitAcquired = (oppId) => {
+    const opp = opportunities.find((o) => o.id === oppId);
+    setAutoApplyQueue((prev) =>
+      prev.map((entry) =>
+        entry.oppId === oppId ? { ...entry, status: 'acquired', acquiredAt: new Date().toISOString() } : entry
+      )
+    );
+    addToast('Benefit Received', `${opp?.title || 'This benefit'} was marked as received.`, 'success');
+  };
+
   const clearAutoApplyHistory = () => {
     setAutoApplyQueue((prev) => prev.filter((entry) => entry.status !== 'applied'));
+  };
+
+  const clearAcquiredBenefits = () => {
+    setAutoApplyQueue((prev) => prev.filter((entry) => entry.status !== 'acquired'));
   };
 
   // Dev/demo helper: one click uploads every known document type to the vault, seeds a
@@ -564,7 +576,7 @@ export const AppProvider = ({ children }) => {
           fileType: d.fileType || d.file_type || 'PDF',
           verifiedBadge: 'Super Admin Verified ✓',
           uploadedAt: 'Synced from Super Admin Vault',
-          thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+          thumbnail: d.thumbnail || getDocumentPlaceholderThumbnail(d.type || 'Identity Card'),
         }));
         setDocuments(formatted);
         localStorage.setItem('alalay_documents', JSON.stringify(formatted));
@@ -585,7 +597,7 @@ export const AppProvider = ({ children }) => {
             fileType: d.file_type || 'PDF',
             verifiedBadge: 'Super Admin Verified ✓',
             uploadedAt: 'Synced from Database',
-            thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+            thumbnail: d.thumbnail || getDocumentPlaceholderThumbnail(d.type || 'Identity Card'),
           }));
           setDocuments(formatted);
           localStorage.setItem('alalay_documents', JSON.stringify(formatted));
@@ -795,7 +807,7 @@ export const AppProvider = ({ children }) => {
       fileType: d.fileType || d.file_type || 'PDF',
       verifiedBadge: 'Super Admin Verified ✓',
       uploadedAt: 'Synced from Super Admin Vault',
-      thumbnail: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&auto=format&fit=crop&q=80',
+      thumbnail: d.thumbnail || getDocumentPlaceholderThumbnail(d.type || 'Identity Card'),
     }));
 
     setDocuments(formattedDocs);
@@ -905,19 +917,14 @@ export const AppProvider = ({ children }) => {
         return { success: true, isAdmin: false };
       }
     } else {
-      // Dynamic fallback for new registration/login
-      const isQuickAdmin = cleanEmail.toLowerCase().includes('admin');
+      // Dynamic fallback for new registration/login — always a citizen account. Admin
+      // access must come from a real managedUsers/Supabase admin-role match above, never
+      // be inferred from the login email itself (previously any email containing the
+      // substring "admin" was granted instant Super Admin access with no password check).
       setIsAuthenticated(true);
       localStorage.setItem('alalay_auth', 'true');
-
-      if (isQuickAdmin) {
-        setViewMode('admin');
-        addToast('Admin Session', 'Signed in to Super Admin Portal.', 'success');
-        return { success: true, isAdmin: true };
-      } else {
-        setViewMode('user');
-        return { success: true, isAdmin: false };
-      }
+      setViewMode('user');
+      return { success: true, isAdmin: false };
     }
   };
 
@@ -1697,7 +1704,7 @@ export const AppProvider = ({ children }) => {
       status: 'Valid',
       verifiedBadge: 'DocAgent Verified ✓',
       uploadedAt: 'Just now via DocAgent OCR',
-      thumbnail: docData.thumbnail || 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=200&auto=format&fit=crop&q=80',
+      thumbnail: docData.thumbnail || getDocumentPlaceholderThumbnail(docData.type || 'Identity Card'),
       attributes: docData.attributes || {},
     };
 
@@ -1810,6 +1817,8 @@ export const AppProvider = ({ children }) => {
         submitAutoApply,
         dismissAutoApply,
         clearAutoApplyHistory,
+        markBenefitAcquired,
+        clearAcquiredBenefits,
         generateAllTestDocuments,
         opportunities,
         categories: CATEGORIES,

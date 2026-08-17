@@ -32,6 +32,18 @@ import {
   TOP_MATCH_SCORE,
 } from '../../services/rulesEngine';
 
+// Some agencies (e.g. PhilHealth) end up with different opp.categoryColor values across
+// opportunity entries depending on how each was categorized upstream. Override those known
+// agencies to a single consistent brand color instead of trusting per-entry categoryColor.
+const AGENCY_COLOR_OVERRIDES = [
+  { match: /philhealth|philippine health insurance/i, color: '#FF2D55' },
+];
+
+const getAgencyBadgeColor = (opp) => {
+  const override = AGENCY_COLOR_OVERRIDES.find((entry) => entry.match.test(opp.agency || ''));
+  return override?.color || opp.categoryColor || '#007AFF';
+};
+
 export const ExploreCategories = () => {
   const {
     opportunities,
@@ -70,8 +82,8 @@ export const ExploreCategories = () => {
 
   const eligibilityOptions = [
     { id: 'all', label: t('explore.filter.all') },
+    { id: '80_match', label: t('explore.filter.eighty') },
     { id: 'Likely Eligible', label: t('explore.filter.top') },
-    { id: 'Needs Review', label: t('explore.filter.needsReview') },
   ];
 
   // Dynamically rank all opportunities for this citizen
@@ -129,17 +141,17 @@ export const ExploreCategories = () => {
         return isPinned && matchesCategory && matchesSearch;
       }
 
-      // Keep the default feed focused on stronger matches. Lower scores remain available
-      // through the explicit review filter when a citizen wants to see them.
+      // "All" truly means every match score, no floor. The 80% and Top Match tabs then
+      // progressively narrow that down.
       const meetsMinimumMatch = (opp.matchScore || 0) >= MINIMUM_DISPLAY_MATCH_SCORE;
       const meetsTopMatch = (opp.matchScore || 0) >= TOP_MATCH_SCORE;
       const matchesEligibility =
         selectedEligibilityFilter === 'all'
-          ? meetsMinimumMatch
-          : selectedEligibilityFilter === 'Likely Eligible'
-            ? meetsTopMatch
-            : selectedEligibilityFilter === 'Needs Review'
-              ? !meetsMinimumMatch
+          ? true
+          : selectedEligibilityFilter === '80_match'
+            ? meetsMinimumMatch
+            : selectedEligibilityFilter === 'Likely Eligible'
+              ? meetsTopMatch
               : opp.matchStatus === selectedEligibilityFilter;
 
       return matchesCategory && matchesSearch && matchesEligibility;
@@ -212,8 +224,8 @@ export const ExploreCategories = () => {
           {t('explore.showing')} <strong>{filteredOpportunities.length}</strong>{' '}
           {showPinnedOnly
             ? t('explore.pinnedServices')
-            : selectedEligibilityFilter === 'Needs Review'
-              ? t('explore.servicesToReview')
+            : selectedEligibilityFilter === 'all'
+              ? t('explore.servicesAll')
               : selectedEligibilityFilter === 'Likely Eligible'
                 ? t('explore.servicesTop')
                 : t('explore.servicesDefault')}
@@ -286,7 +298,7 @@ export const ExploreCategories = () => {
                   <div className="flex items-center justify-between gap-2 flex-wrap pr-8">
                     <span
                       className="text-xs font-bold px-3 py-1 rounded-full text-white shadow-2xs"
-                      style={{ backgroundColor: opp.categoryColor || '#007AFF' }}
+                      style={{ backgroundColor: getAgencyBadgeColor(opp) }}
                     >
                       {opp.agency || 'Government Service'}
                     </span>

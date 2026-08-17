@@ -1,18 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Sparkles,
   Search,
   ArrowRight,
   Shield,
   ShieldCheck,
-  CheckCircle2,
   HeartPulse,
   Coins,
   GraduationCap,
   Briefcase,
   Plane,
   ChevronRight,
-  ChevronDown,
   Bot,
   User,
   ExternalLink,
@@ -22,7 +20,6 @@ import {
   Calendar,
   Award,
   X,
-  History,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { AlalayLogo } from '../common/AlalayLogo';
@@ -45,7 +42,6 @@ export const HomeDashboard = () => {
     autoApplyQueue,
     submitAutoApply,
     dismissAutoApply,
-    clearAutoApplyHistory,
     t,
   } = useApp();
 
@@ -63,18 +59,6 @@ export const HomeDashboard = () => {
       .map((entry) => ({ ...entry, opp: rankedOpportunities.find((o) => o.id === entry.oppId) }))
       .filter((entry) => entry.opp);
   }, [autoApplyQueue, rankedOpportunities]);
-
-  // Persisted history of everything Auto-Apply has actually submitted (survives refresh,
-  // unlike the toast notification shown at the moment of submission).
-  const appliedAutoApplyEntries = useMemo(() => {
-    return (autoApplyQueue || [])
-      .filter((entry) => entry.status === 'applied')
-      .map((entry) => ({ ...entry, opp: rankedOpportunities.find((o) => o.id === entry.oppId) }))
-      .filter((entry) => entry.opp)
-      .sort((a, b) => new Date(b.appliedAt || 0) - new Date(a.appliedAt || 0));
-  }, [autoApplyQueue, rankedOpportunities]);
-
-  const [showApplyHistory, setShowApplyHistory] = useState(false);
 
   const visibleOpportunities = useMemo(
     () => rankedOpportunities.filter((opp) => (opp.matchScore || 0) >= MINIMUM_DISPLAY_MATCH_SCORE),
@@ -238,88 +222,6 @@ export const HomeDashboard = () => {
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Auto-Apply History: everything already submitted, persists across refresh */}
-      {appliedAutoApplyEntries.length > 0 && (
-        <div className="rounded-2xl bg-white border border-slate-200/90 shadow-2xs overflow-hidden">
-          <div className="w-full p-4 sm:p-5 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setShowApplyHistory((prev) => !prev)}
-              className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0"
-            >
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#093a96] flex items-center justify-center flex-shrink-0">
-                <History className="w-5 h-5" />
-              </div>
-              <div className="text-left min-w-0">
-                <h4 className="text-xs sm:text-sm font-bold text-[#0f172a]">
-                  {t('home.autoApply.historyTitle')} ({appliedAutoApplyEntries.length})
-                </h4>
-                <p className="text-[11px] text-slate-500">
-                  {t('home.autoApply.historyDesc')}
-                </p>
-              </div>
-            </button>
-
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => clearAutoApplyHistory()}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 text-[10px] font-bold transition-colors cursor-pointer"
-              >
-                {t('home.autoApply.clearAll')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowApplyHistory((prev) => !prev)}
-                aria-label={showApplyHistory ? 'Collapse history' : 'Expand history'}
-                className="cursor-pointer"
-              >
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showApplyHistory ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-          </div>
-
-          {showApplyHistory && (
-            <div className="px-4 sm:px-5 pb-4 sm:pb-5 space-y-2">
-              {appliedAutoApplyEntries.map((entry) => (
-                <div
-                  key={entry.oppId}
-                  onClick={() => setSelectedOpportunity(entry.opp)}
-                  className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-blue-300 flex items-center justify-between gap-3 flex-wrap cursor-pointer transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#1C1C1E] truncate">{entry.opp.title}</p>
-                    <p className="text-[10px] text-slate-500 truncate">
-                      {entry.opp.agency || 'Government Service'} • Applied{' '}
-                      {entry.appliedAt
-                        ? new Date(entry.appliedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : 'recently'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>{t('home.autoApply.applied')}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        dismissAutoApply(entry.oppId);
-                      }}
-                      aria-label="Remove from history"
-                      className="w-6 h-6 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-600 text-slate-400 flex items-center justify-center transition-colors cursor-pointer"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
