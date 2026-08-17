@@ -54,6 +54,7 @@ export const DocumentsView = () => {
   const {
     documents,
     user,
+    setUser,
     opportunities,
     setUploadModalOpen,
     updateDocument,
@@ -181,6 +182,38 @@ export const DocumentsView = () => {
 
   const handleRenewSuccess = (docId) => {
     replaceDocument(docId);
+  };
+
+  const handleSyncResumeToProfile = (doc) => {
+    if (!doc || !user || !setUser) return;
+    const p = doc.attributes || {};
+    const updatedUser = { ...user };
+
+    if (p.firstName) updatedUser.firstName = p.firstName;
+    if (p.lastName) updatedUser.lastName = p.lastName;
+    if (p.middleName) updatedUser.middleName = p.middleName;
+    if (p.fullName) updatedUser.fullName = p.fullName;
+    if (p.email) updatedUser.email = p.email;
+    if (p.phone) updatedUser.phone = p.phone;
+    if (p.address) updatedUser.address = p.address;
+    if (p.gender) updatedUser.gender = p.gender;
+    if (p.dateOfBirth) updatedUser.birthDate = p.dateOfBirth;
+    if (p.civilStatus) updatedUser.civilStatus = p.civilStatus;
+    if (p.nationality) updatedUser.citizenship = p.nationality;
+    if (p.skills && p.skills.length > 0) {
+      const existing = updatedUser.skills || [];
+      updatedUser.skills = Array.from(new Set([...existing, ...p.skills]));
+    }
+    if (p.education) updatedUser.education = p.education;
+    if (p.experience) updatedUser.workExperience = p.experience;
+
+    setUser(updatedUser);
+    localStorage.setItem('alalay_user', JSON.stringify(updatedUser));
+    addToast(
+      'Profile Synchronized',
+      `Synchronized ${p.skills?.length || 0} skills & candidate attributes to citizen profile.`,
+      'success'
+    );
   };
 
   const handleStartEdit = (doc) => {
@@ -987,6 +1020,19 @@ export const DocumentsView = () => {
                       <Edit className="w-3.5 h-3.5" />
                       <span>Edit Fields</span>
                     </button>
+                    {(activeDocumentForPreview.type?.includes('Resume') ||
+                      activeDocumentForPreview.type?.includes('Bio-Data') ||
+                      activeDocumentForPreview.attributes?.skills) && (
+                      <button
+                        type="button"
+                        onClick={() => handleSyncResumeToProfile(activeDocumentForPreview)}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        title="Sync Extracted Resume Data & Skills to Profile"
+                      >
+                        <User className="w-3.5 h-3.5" />
+                        <span>Sync to Profile</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => downloadApplicationAsDoc(activeDocumentForPreview, user)}
@@ -1195,7 +1241,17 @@ export const DocumentsView = () => {
                                 {k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ')}
                               </td>
                               <td className="p-2.5 font-semibold text-slate-900 border border-slate-300">
-                                {String(v || '—')}
+                                {Array.isArray(v) ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {v.map((item, i) => (
+                                      <span key={i} className="px-2 py-0.5 rounded-md bg-blue-100 text-[#093a96] text-[10px] font-bold">
+                                        {item}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="whitespace-pre-line">{String(v || '—')}</span>
+                                )}
                               </td>
                             </tr>
                           ))}

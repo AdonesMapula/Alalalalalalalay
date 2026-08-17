@@ -8,8 +8,14 @@
  * 4. Dynamic Civic Opportunity Gap-Filling & Readiness Optimization
  */
 
+import { RESUME_PRESETS, parseResumeText } from './resumeParserService.js';
+
 // Statutory Document Validity Periods (in Days)
 export const STATUTORY_VALIDITY_DAYS = {
+  'Utility Bill / Proof of Billing': 90, // 3 months (Standard Utility/Proof of Billing)
+  'Payslip / Proof of Income': 90, // 3 months
+  'Resume / Curriculum Vitae (CV)': 730, // 2 years
+  'Bio-Data / Personal Data Sheet': 365, // 1 year
   'Barangay Certificate': 180, // 6 months (DILG Standard)
   'Barangay Indigency': 180, // 6 months
   'Barangay Clearance': 180, // 6 months
@@ -29,6 +35,20 @@ export const STATUTORY_VALIDITY_DAYS = {
 // like the document it represents (ID card, seal-stamped certificate, clearance, etc.)
 // instead of an unrelated stock photo.
 const DOCUMENT_VISUAL_PROFILES = [
+  {
+    match: (type) => /utility bill|proof of billing|billing statement|water|electric|meralco|mcwd|maynilad/i.test(type),
+    label: 'PROOF OF BILLING',
+    kind: 'card',
+    from: '#0284c7',
+    to: '#0ea5e9',
+  },
+  {
+    match: (type) => /payslip|income|itr|compensation/i.test(type),
+    label: 'PROOF OF INCOME',
+    kind: 'briefcase',
+    from: '#059669',
+    to: '#10b981',
+  },
   {
     match: (type) => /national id|gov id|identity card|osca|pwd identification/i.test(type),
     label: 'GOVERNMENT ID',
@@ -70,6 +90,13 @@ const DOCUMENT_VISUAL_PROFILES = [
     kind: 'seal',
     from: '#0e7490',
     to: '#22d3ee',
+  },
+  {
+    match: (type) => /resume|cv|curriculum vitae|bio-data|biodata|personal data/i.test(type),
+    label: 'RESUME / CV',
+    kind: 'briefcase',
+    from: '#1e3a8a',
+    to: '#3b82f6',
   },
   {
     match: (type) => /employment|coe|civil service/i.test(type),
@@ -347,6 +374,66 @@ export const OCR_PRESET_TEMPLATES = {
     confidenceScore: 98.6,
     textClarity: 'Optimal (99%)',
   },
+  resume_dev: {
+    type: 'Resume / Curriculum Vitae (CV)',
+    name: 'Full-Stack Developer Professional Resume',
+    issuer: 'Candidate Self-Authored / Verified Portfolio',
+    documentNumber: 'RES-TECH-2026-9941',
+    validityDays: 730,
+    thumbnail: getDocumentPlaceholderThumbnail('Resume / Curriculum Vitae (CV)'),
+    attributes: {
+      fullName: 'Adones Mendoza Santos',
+      email: 'adones.santos@egov.ph',
+      phone: '+63 917 842 1099',
+      address: 'Unit 402, Katipunan Ave, Quezon City, Metro Manila',
+      headline: 'Full-Stack Software Engineer & Solutions Architect',
+      skills: ['JavaScript', 'TypeScript', 'React', 'Next.js', 'Node.js', 'Python', 'PostgreSQL', 'Docker', 'AWS', 'Git'],
+      education: 'B.S. Computer Science, University of the Philippines Diliman',
+      experience: 'Senior Full-Stack Engineer at CivicTech Innovations Inc. (2021-Present)',
+    },
+    confidenceScore: 99.2,
+    textClarity: 'Optimal (100%)',
+  },
+  resume_nurse: {
+    type: 'Resume / Curriculum Vitae (CV)',
+    name: 'Registered Nurse Clinical CV',
+    issuer: 'PRC Board Certified Healthcare Practitioner',
+    documentNumber: 'RES-MED-2026-8812',
+    validityDays: 730,
+    thumbnail: getDocumentPlaceholderThumbnail('Resume / Curriculum Vitae (CV)'),
+    attributes: {
+      fullName: 'Maria Elena De Los Santos Cruz',
+      email: 'maria.cruz.rn@health.gov.ph',
+      phone: '+63 918 554 9021',
+      address: '142 Mabini St., Brgy. Loyola Heights, Quezon City',
+      headline: 'Registered Nurse (PRC License #0098412)',
+      skills: ['Patient Care', 'Clinical Charting', 'Basic Life Support (BLS)', 'ACLS', 'Pharmacology', 'Triage'],
+      education: 'B.S. Nursing, University of Santo Tomas',
+      experience: 'Staff Nurse at Quezon City General Hospital (2020-Present)',
+    },
+    confidenceScore: 98.8,
+    textClarity: 'Optimal (99%)',
+  },
+  resume_admin: {
+    type: 'Resume / Curriculum Vitae (CV)',
+    name: 'Administrative Officer Bio-Data & PDS',
+    issuer: 'Civil Service Eligible Public Specialist',
+    documentNumber: 'RES-ADM-2026-4402',
+    validityDays: 730,
+    thumbnail: getDocumentPlaceholderThumbnail('Resume / Curriculum Vitae (CV)'),
+    attributes: {
+      fullName: 'Corazon Villanueva Ramos',
+      email: 'corazon.ramos@dswd.gov.ph',
+      phone: '+63 920 412 8849',
+      address: '88 Commonwealth Avenue, Diliman, Quezon City',
+      headline: 'Administrative Officer & Public Records Specialist',
+      skills: ['Microsoft Office', 'Excel', 'SAP', 'Accounting', 'Records Management', 'Customer Service', 'Leadership'],
+      education: 'Bachelor of Public Administration, PUP Manila',
+      experience: 'Administrative Officer IV at DSWD (2019-Present)',
+    },
+    confidenceScore: 98.5,
+    textClarity: 'High (98%)',
+  },
 };
 
 /**
@@ -361,9 +448,16 @@ export async function scanAndExtractDocumentMetadata(fileOrName, customFields = 
 
   let template = OCR_PRESET_TEMPLATES.philsys;
 
-  // Ordered most-specific-first so overlapping words (e.g. both NBI and Police clearances
-  // contain "clearance") resolve to the right template instead of always matching NBI.
-  if (lower.includes('police') || lower.includes('pnp')) {
+  // Check for Resume / CV
+  if (lower.includes('resume') || lower.includes('cv') || lower.includes('curriculum vitae') || lower.includes('bio-data') || lower.includes('biodata')) {
+    if (lower.includes('nurse') || lower.includes('health') || lower.includes('medical')) {
+      template = OCR_PRESET_TEMPLATES.resume_nurse;
+    } else if (lower.includes('admin') || lower.includes('officer') || lower.includes('public')) {
+      template = OCR_PRESET_TEMPLATES.resume_admin;
+    } else {
+      template = OCR_PRESET_TEMPLATES.resume_dev;
+    }
+  } else if (lower.includes('police') || lower.includes('pnp')) {
     template = OCR_PRESET_TEMPLATES.police_clearance;
   } else if (lower.includes('nbi')) {
     template = OCR_PRESET_TEMPLATES.nbi;

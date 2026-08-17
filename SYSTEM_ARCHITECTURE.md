@@ -1,6 +1,6 @@
 # ALALAY System Architecture & Engineering Blueprint
 
-The **ALALAY (Alalalalalalalay)** platform is an intelligent Philippine Citizen Assistance, Statutory Benefits Discovery, and Government Service Navigation system. It connects verified Citizen's Charters with citizen demographic profiles through a multi-factor deterministic matching engine, automated scrapers, a secure DocAgent Document Vault, an Active Benefit Tracker, and grounded Google Gemini Generative AI.
+The **ALALAY (Alalalalalalalay)** platform is an intelligent Philippine Citizen Assistance, Statutory Benefits Discovery, Document Intelligence, and Government Service Navigation system. It connects verified Citizen's Charters with citizen demographic profiles through a multi-factor deterministic matching engine, automated scrapers, a secure **DocAgent Document Vault with Multimodal Vision OCR**, an **Active Benefit Tracker**, and grounded **Google Gemini Generative AI**.
 
 ---
 
@@ -41,19 +41,22 @@ flowchart TB
     end
 
     %% ─────────────────────────────────────────────
-    %% 3. CORE ENGINES AND AI INTEGRATION
+    %% 3. CORE ENGINES, OCR & AI INTEGRATION
     %% ─────────────────────────────────────────────
-    subgraph CoreEnginesAI["3. Core Engines & AI Integration"]
+    subgraph CoreEnginesAI["3. Core Engines, Vision OCR & AI Integration"]
         direction LR
 
         RULES_ENGINE["Deterministic Rules Engine<br/>Age, RA 9994, RA 11861, RA 10754, RA 11261"]
+        VISION_OCR["Multimodal Vision & Local OCR<br/>imageParserService.js (Gemini Vision + Tesseract.js)"]
+        NORMALIZER["Image Content Classifier<br/>classifyAndNormalizeExtractedData (100% content-driven)"]
         INTENT_RAG["Intent-Aware Smart RAG<br/>Topic vs. Intent classifier (analyzeQuestion)"]
-        DOC_AGENT["DocAgent AI Sentinel<br/>OCR parsing, expiration watchdog, gap-filling"]
+        DOC_AGENT["DocAgent AI Sentinel<br/>Statutory validity watchdog, renewal packet generator"]
         AUTO_APPLY_ENG["Auto-Apply Consent Engine<br/>95%+ threshold, confirm-each / autonomous"]
         SECURE_PROXY["Secure Gemini API Proxy<br/>/api/alalay/chat, sliding-window rate limiter"]
         DUAL_KEY["Dual-Key Failover Router<br/>Primary and reserve API keys"]
         GEMINI_ENGINE["Google Gemini AI Flash Engine<br/>Grounded reasoning and step generation"]
 
+        VISION_OCR --> NORMALIZER --> DOC_AGENT
         RULES_ENGINE --> INTENT_RAG
         DOC_AGENT --> INTENT_RAG
         INTENT_RAG --> SECURE_PROXY --> DUAL_KEY --> GEMINI_ENGINE
@@ -68,8 +71,9 @@ flowchart TB
         CITIZEN_DASH["Citizen Dashboard<br/>Personalized recommendations, Auto-Apply queue"]
         BENEFIT_TRACKER["Active Benefit Tracker Page<br/>Enrolled statutory benefits, claims, active status"]
         EXPLORE_VIEW["Explore & Categories<br/>Search, agency filters, citizen charter drawer"]
-        DOC_VAULT["DocAgent Document Vault<br/>OCR upload, audit health, renewal modal"]
-        INTAKE_AGENT["Conversational Intake Agent<br/>Step-by-step form completion and verification"]
+        DOC_MODAL["Document Upload & OCR Modal<br/>Live image scan, confidence score, auto-fill"]
+        DOC_VAULT["DocAgent Document Vault<br/>AES-256 encrypted locker, compliance meter"]
+        INTAKE_AGENT["Conversational Intake Agent<br/>Step-by-step form completion and image auto-fill"]
         AI_WORKSPACE["Ask ALALAY Full-Page Workspace<br/>Bilingual chat, grounded procedures, exports"]
         DETAIL_MODAL["3:1 Dual-Card Modal<br/>Opportunity details and live side-AI chat"]
         ADMIN_PORTAL["Admin Triage & Operations<br/>Scraper pipeline monitor, review queue, audit logs"]
@@ -78,6 +82,7 @@ flowchart TB
         CITIZEN_DASH --> EXPLORE_VIEW
         CITIZEN_DASH --> INTAKE_AGENT
         EXPLORE_VIEW --> DETAIL_MODAL
+        DOC_MODAL --> DOC_VAULT
         DOC_VAULT --> BENEFIT_TRACKER
         DETAIL_MODAL --> AI_WORKSPACE
     end
@@ -90,11 +95,13 @@ flowchart TB
     ALLOWLIST_GUARD -->|Verified Ingestions| SUPABASE_DB
 
     GLOBAL_STATE -->|Citizen Profile & Docs| RULES_ENGINE
-    GLOBAL_STATE -->|Uploaded Credentials| DOC_AGENT
+    GLOBAL_STATE -->|Uploaded Image / File Buffer| VISION_OCR
     RULES_ENGINE -->|Eligibility & Entitlement Status| BENEFIT_TRACKER
     RULES_ENGINE -->|Ranked Match Scores| CITIZEN_DASH
     RULES_ENGINE -->|Auto-Apply Qualification| AUTO_APPLY_ENG
 
+    NORMALIZER -->|Autofilled Document & Attributes| DOC_MODAL
+    NORMALIZER -->|Direct Question Autofill| INTAKE_AGENT
     DOC_AGENT -->|Vault Health & Readiness| DOC_VAULT
     DOC_AGENT -->|Document Verification Flags| BENEFIT_TRACKER
 
@@ -115,8 +122,8 @@ flowchart TB
 
     class ADMIN_MGMT,TIER_A,TIER_B,SCRAPER_PIPE,ALLOWLIST_GUARD source
     class SUPABASE_DB,GLOBAL_STATE,LOCAL_STORAGE,I18N_ENGINE storage
-    class RULES_ENGINE,INTENT_RAG,DOC_AGENT,AUTO_APPLY_ENG,SECURE_PROXY,DUAL_KEY,GEMINI_ENGINE engine
-    class CITIZEN_DASH,BENEFIT_TRACKER,EXPLORE_VIEW,DOC_VAULT,INTAKE_AGENT,AI_WORKSPACE,DETAIL_MODAL,ADMIN_PORTAL workflow
+    class RULES_ENGINE,VISION_OCR,NORMALIZER,INTENT_RAG,DOC_AGENT,AUTO_APPLY_ENG,SECURE_PROXY,DUAL_KEY,GEMINI_ENGINE engine
+    class CITIZEN_DASH,BENEFIT_TRACKER,EXPLORE_VIEW,DOC_MODAL,DOC_VAULT,INTAKE_AGENT,AI_WORKSPACE,DETAIL_MODAL,ADMIN_PORTAL workflow
 
     linkStyle default stroke:#64748b,stroke-width:1.3px
 ```
@@ -141,13 +148,15 @@ flowchart TB
 
 ---
 
-### 2.3 Layer 3: Core Engines & AI Integration
+### 2.3 Layer 3: Core Engines, Vision OCR & AI Integration
+- **Multimodal Image & Document Parser (`imageParserService.js`)**:
+  - **Deep Whole-Image Analysis**: Operates directly on image pixels (via Google Gemini Vision AI or client-side `tesseract.js` fallback) to extract text, agency seals, table rows, account numbers, and due dates.
+  - **100% Content-Driven Classification (`classifyAndNormalizeExtractedData`)**: Ignores arbitrary file names (`IMG_1029.jpg`, `photo.jpeg`) to prevent spoofing or misclassification.
+  - **Expanded Document Matrix**: Accurately classifies **Utility Bills / Proof of Billing** (Metropolitan Cebu Water District MCWD, Maynilad, Manila Water, Meralco, Electric Cooperatives, Telco/Internet), **National IDs**, **Barangay Certificates**, **NBI Clearances**, **PhilHealth MDR**, **PSA Birth Certificates**, **Medical Certificates**, **Payslips**, **COE**, and **Resumes**.
 - **Multi-Factor Deterministic Rules Engine (`rulesEngine.js`)**: Evaluates exact Boolean and mathematical eligibility rules for Senior Citizens (RA 9994 / RA 10645), Solo Parents (RA 11861), PWDs (RA 10754), First-Time Jobseekers (RA 11261), salary loan contributions, and indigent safety nets (**DOH MAP / DSWD AICS**). **AI never calculates financial amounts or eligibility decisions.**
 - **Intent-Aware Smart RAG Retriever (`geminiService.js`)**: Deconstructs citizen inquiries by separating the **Subject** (program/benefit/agency) from the **Intent** (available options, requirements, eligibility, application steps, fees, processing time, validity duration). Eliminates keyword collision errors.
-- **DocAgent AI Document Sentinel (`docAgentService.js`)**: Autonomous OCR parser, expiration watchdog, and compliance health auditor. Proactively detects expiring IDs, clearances, and medical abstracts, offering 1-click renewal workflows.
-- **Auto-Apply Consent & Queue Engine**: Evaluates citizen readiness against a strict 95%+ "Likely Eligible" bar. Operates in two user-authorized consent modes:
-  - *Confirm Each Application* (Citizen reviews prepared forms and taps Submit).
-  - *Full Automation* (System submits verified statutory claims automatically and notifies the user).
+- **DocAgent AI Document Sentinel (`docAgentService.js`)**: Autonomous OCR parser, expiration watchdog, and compliance health auditor. Evaluates statutory validity horizons (90 days for utility bills/payslips, 180 days for barangay clearances, 1 year for NBI clearances, 10 years for PhilSys IDs).
+- **Auto-Apply Consent & Queue Engine**: Evaluates citizen readiness against a strict 95%+ "Likely Eligible" bar. Operates in two user-authorized consent modes (*Confirm Each Application* vs. *Full Automation*).
 - **Secure Gemini API Proxy & Rate Limiter**: Encapsulates API tokens within a secure backend endpoint (`/api/alalay/chat`) with client direct fallback. Features a sliding-window rate limiter (20 RPM) and inter-request throttle delay (800ms).
 - **Dual-Key Automatic Failover Router**: Automatically switches execution from Primary Key (`VITE_GEMINI_API`) to Reserve Key (`VITE_GEMINI_API_RESERVE`) upon encountering 401, 403, 429, or `RESOURCE_EXHAUSTED` responses.
 - **Google Gemini Generative AI Service**: Produces structured, empathetic procedural guides formatted with numbered steps, requirement checklists, and `.gov.ph` citation badges.
@@ -157,17 +166,20 @@ flowchart TB
 ### 2.4 Layer 4: Client Workflows & Interactive Interfaces
 
 - **Citizen Home Dashboard (`HomeDashboard.jsx`)**: Displays prioritized opportunity feeds, Senior Citizen Mode entitlements, recommended services, and Auto-Apply queue status.
-- **Active Benefit Tracker (`BenefitTrackerView.jsx` / Benefit Tracker Page)**:
+- **Active Benefit Tracker (`BenefitTrackerView.jsx`)**:
   - **Comprehensive Benefit Dashboard**: Dedicated screen displaying all public benefits, statutory entitlements, and welfare programs that the citizen currently holds or has actively unlocked.
   - **Live Status & Expiration Watchdog**: Tracks active coverage status, validity windows, renewal dates, and annual re-certification requirements (e.g. OSCA social pension disbursement periods, PhilHealth Konsulta validity, PWD ID validity, SSS loan amortization schedules).
   - **Document Vault Linkage**: Cross-references held benefits with supporting vault documents, flagging any missing prerequisites required to maintain active benefit status.
   - **Entitlement Value Summary**: Aggregates statutory discount privileges (20% discount + 12% VAT exemption, free tuition under RA 10931, PhilHealth Zero-Balance Billing).
+- **Document Upload & OCR Modal (`DocumentUploadModal.jsx`)**:
+  - Displays live image preview with laser scanning animation.
+  - Displays exclusively the **Confidence Level** (`97%`), **Document Name**, and **Document Type**.
+  - Populates primary form fields automatically from image analysis.
 - **Explore & Categorized Services (`ExploreCategories.jsx`)**: Searchable index of verified Philippine public services with agency filters (PhilHealth, SSS, CHED, DOH, DSWD, OSCA) and Citizen's Charter drawer.
 - **DocAgent Document Vault (`DocumentsView.jsx` & `DocAgentRenewalModal.jsx`)**: AES-256 encrypted digital locker with autonomous OCR ingestion, compliance score meter, and step-by-step renewal modal.
-- **Conversational Application Intake Agent (`ApplicationIntakeAgent.jsx`)**: Interactive AI-assisted application intake assistant guiding citizens through form field completion, document validation, and submission preparation.
+- **Conversational Application Intake Agent (`ApplicationIntakeAgent.jsx`)**: Interactive AI-assisted application intake assistant guiding citizens through form field completion, document validation, and submission preparation with direct image drop autofill.
 - **Dedicated Full-Page AI Workspace (`AskAlalayPageView.jsx`)**: Full-screen workspace with fixed card bounds, pinned header, independently scrolling middle conversation stream, and pinned bottom input island.
 - **3 : 1 Dual-Card Service Detail Modal (`OpportunityDetailModal.jsx`)**: Responsive dual-card interface with smooth slide animation, sticky headers/action footers, and live side AI chat.
-- **User-Isolated Chat Archives (`ChatArchivesView.jsx`)**: Displays exclusively the signed-in citizen's previous AI consultations with 1-click resumption.
 - **Admin Triage & Operations Hub (`AdminDashboard.jsx`)**: Features a fixed, non-scrolling sticky sidebar (`h-screen sticky top-0`) for navigation, user management, live scraping monitors, and AI review queues.
 
 ---
@@ -178,6 +190,8 @@ flowchart TB
 sequenceDiagram
     autonumber
     actor Citizen as Citizen User
+    participant Modal as Document Upload Modal
+    participant Vision as Multimodal Vision & OCR Engine
     participant App as Client (AppContext & Views)
     participant Rules as Deterministic Rules Engine
     participant DocAgent as DocAgent Sentinel & Vault
@@ -191,15 +205,25 @@ sequenceDiagram
     App->>DB: Fetch Citizen Profile & Uploaded Documents
     DB-->>App: Return user, user_documents, active_benefits
 
-    %% Step 2: Deterministic Evaluation & Benefit Tracking
-    App->>Rules: Evaluate Profile (Age, PWD, Solo Parent, Income)
+    %% Step 2: Document Upload & Multimodal Vision Parsing
+    Citizen->>Modal: Upload Document Image (e.g. MCWD Water Bill / PhilSys ID)
+    Modal->>Vision: Send Base64 Image Buffer (parseUploadedImage)
+    Vision->>Vision: Execute Gemini Vision / Local Tesseract OCR
+    Vision->>Vision: Normalize & Classify from Image Pixels (100% Content-Driven)
+    Vision-->>Modal: Return { confidenceScore: 97%, docName, docType, issuer, docNumber, expirationDate }
+    Modal-->>Citizen: Render Confidence Level, Document Name & Type + Auto-filled Form
+    Citizen->>Modal: Confirm & Tap "Save to Vault"
+    Modal->>DocAgent: Store Encrypted Document & Sync Profile Attributes
+
+    %% Step 3: Deterministic Evaluation & Benefit Tracking
+    App->>Rules: Evaluate Profile (Age, PWD, Solo Parent, Income, Uploaded Docs)
     Rules-->>App: Return Match Scores (0-100%) & Statutory Entitlements
     App->>DocAgent: Audit Document Vault Health & Expirations
     DocAgent-->>App: Return Compliance Score & Expiration Flags
     App->>Tracker: Populate Active Benefits, Renewal Watchdog & Value Summary
 
-    %% Step 3: Citizen Inquiry & Intent-Aware AI Grounding
-    Citizen->>App: Submit Question ("How to renew my barangay clearance?")
+    %% Step 4: Citizen Inquiry & Intent-Aware AI Grounding
+    Citizen->>App: Submit Question ("What benefits can I apply for with my water bill?")
     App->>RAG: Analyze Question (Subject vs. Intent)
     RAG->>DB: Retrieve Authoritative Charters & Scraped Directory
     DB-->>RAG: Return Candidate Records & Official Portals
@@ -213,8 +237,9 @@ sequenceDiagram
 ## 4. Architectural Principles & Guarantees
 
 1. **Deterministic Primacy**: All eligibility evaluations, match percentages, and benefit amounts are computed deterministically. AI never decides eligibility.
-2. **Intent-Separated RAG**: Retrieval is filtered by both subject and query intent to prevent keyword collisions.
-3. **Continuous Benefit Tracking**: The Active Benefit Tracker maintains real-time visibility into citizen entitlements, preventing lapse of coverage.
-4. **Proactive Document Sentinel**: DocAgent monitors expirations and auto-verifies vault documents against agency requirements.
-5. **Strict Scope Guardrails**: Gemini AI is strictly bounded to Philippine government services and citizen welfare, rejecting off-topic queries.
-6. **Zero Disruption Resilience**: Dual-key failover, sliding-window rate limiting, and local grounded reasoning fallbacks guarantee 99.9% uptime.
+2. **Whole-Image Grounded Parsing**: Document analysis reads directly from image pixels (ignoring untrusted file names) to prevent misclassification and spoofing.
+3. **Intent-Separated RAG**: Retrieval is filtered by both subject and query intent to prevent keyword collisions.
+4. **Continuous Benefit Tracking**: The Active Benefit Tracker maintains real-time visibility into citizen entitlements, preventing lapse of coverage.
+5. **Proactive Document Sentinel**: DocAgent monitors expirations (e.g. 90-day utility bill validity) and auto-verifies vault documents against agency requirements.
+6. **Strict Scope Guardrails**: Gemini AI is strictly bounded to Philippine government services and citizen welfare, rejecting off-topic queries.
+7. **Zero Disruption Resilience**: Dual-key failover, sliding-window rate limiting, and local grounded reasoning fallbacks guarantee 99.9% uptime.

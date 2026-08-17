@@ -21,6 +21,10 @@ import {
   ExternalLink,
   RefreshCw,
   ClipboardCheck,
+  UploadCloud,
+  X,
+  File,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import {
@@ -36,6 +40,8 @@ import {
   printApplicationDocument,
 } from '../../services/applyAiService';
 import { getDocumentPlaceholderThumbnail } from '../../services/docAgentService';
+import { parseUploadedImage } from '../../services/imageParserService';
+import { parseResumeFileOrPreset } from '../../services/resumeParserService';
 import logoImg from '../../assets/logos.png';
 
 // =============================================================================
@@ -295,8 +301,11 @@ const IntakeConversation = ({ program, session: initialSession, user, onComplete
   const [inputValue, setInputValue] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [currentFieldId, setCurrentFieldId] = useState(null);
+  const [showResumeModal, setShowResumeModal] = useState(false);
+  const [isParsingResume, setIsParsingResume] = useState(false);
   const chatEndRef = useRef(null);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Initialize with opening greeting
   useEffect(() => {
@@ -316,6 +325,124 @@ const IntakeConversation = ({ program, session: initialSession, user, onComplete
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
+
+  // ── Auto-fill intake form fields using Document & Image Parser ─────────────
+  const handleApplyResumeAutofill = async (file) => {
+    if (!file) return;
+    setIsParsingResume(true);
+    try {
+      const isImage = file.type?.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name);
+      let p = null;
+
+      if (isImage) {
+        p = await parseUploadedImage(file);
+      } else {
+        const res = await parseResumeFileOrPreset(file);
+        if (res.success && res.data) {
+          p = res.data;
+        }
+      }
+
+      if (p) {
+        const updatedFilled = { ...session.filledFields };
+        let filledCount = 0;
+
+        session.template.fields.forEach((field) => {
+          if (updatedFilled[field.id]?.value) return; // already filled
+
+          let candidateVal = '';
+          const fid = field.id.toLowerCase();
+          const flabel = field.label.toLowerCase();
+
+          if (fid.includes('name') || flabel.includes('name')) {
+            candidateVal = p.fullName || `${p.firstName || ''} ${p.lastName || ''}`.trim();
+          } else if (fid.includes('email') || flabel.includes('email')) {
+            candidateVal = p.email;
+          } else if (
+            fid.includes('phone') ||
+            fid.includes('contact') ||
+            fid.includes('mobile') ||
+            flabel.includes('phone') ||
+            flabel.includes('mobile')
+          ) {
+            candidateVal = p.phone;
+          } else if (fid.includes('address') || flabel.includes('address')) {
+            candidateVal = p.address;
+          } else if (
+            fid.includes('birthday') ||
+            fid.includes('birthdate') ||
+            fid.includes('dob') ||
+            flabel.includes('birth')
+          ) {
+            candidateVal = p.dateOfBirth;
+          } else if (fid.includes('gender') || flabel.includes('gender') || flabel.includes('sex')) {
+            candidateVal = p.gender;
+          } else if (fid.includes('civil') || flabel.includes('status') || flabel.includes('marital')) {
+            candidateVal = p.civilStatus;
+          } else if (
+            fid.includes('employ') ||
+            fid.includes('job') ||
+            fid.includes('work') ||
+            flabel.includes('occupation') ||
+            flabel.includes('employment')
+          ) {
+            candidateVal = p.headline || (p.experience ? p.experience.split('\n')[0] : 'Employed');
+          } else if (fid.includes('educ') || flabel.includes('school') || flabel.includes('attainment')) {
+            candidateVal = p.education ? p.education.split('\n')[0] : 'College Graduate';
+          } else if (fid.includes('skill') || flabel.includes('skill')) {
+            candidateVal = Array.isArray(p.skills) ? p.skills.slice(0, 5).join(', ') : p.skills;
+          }
+
+          if (candidateVal) {
+            updatedFilled[field.id] = {
+              value: candidateVal,
+              source: 'documents',
+              confidence: p.confidenceScore || 95,
+              filledAt: new Date().toISOString(),
+            };
+            filledCount++;
+          }
+        });
+
+        const newSession = {
+          ...session,
+          filledFields: updatedFilled,
+        };
+        const remainingGaps = getActiveGapFields(newSession);
+        newSession.isComplete = remainingGaps.length === 0;
+
+        setSession(newSession);
+        setCurrentFieldId(remainingGaps[0]?.id || null);
+        setShowResumeModal(false);
+
+        const agentMsg =
+          filledCount > 0
+            ? `✅ **Document parsed!**\n\nI auto-filled **${filledCount} form field${
+                filledCount !== 1 ? 's' : ''
+              }** from your uploaded ${isImage ? 'image' : 'file'}.\n\n${
+                remainingGaps.length > 0
+                  ? `Let's answer the remaining ${remainingGaps.length} question${
+                      remainingGaps.length !== 1 ? 's' : ''
+                    }:`
+                  : 'All form fields are now complete! Proceeding to document preview...'
+              }`
+            : `✅ Document parsed (${p.fullName || 'Citizen'}), but all standard fields were already filled. Let's continue!`;
+
+        setMessages((prev) => [
+          ...prev,
+          { id: Date.now(), role: 'agent', text: agentMsg },
+        ]);
+
+        if (newSession.isComplete) {
+          setTimeout(() => onComplete(newSession), 1200);
+        }
+      }
+    } catch (err) {
+      console.warn('Document Autofill Error:', err);
+    } finally {
+      setIsParsingResume(false);
+    }
+  };
 
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
@@ -365,41 +492,110 @@ const IntakeConversation = ({ program, session: initialSession, user, onComplete
   const progressPct = Math.round((stats.total / stats.templateTotal) * 100);
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
       {/* ── LEFT: Conversation ── */}
       <div className="flex flex-col flex-1 min-w-0 h-full">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
-          <button
-            type="button"
-            onClick={onBack}
-            className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-base">{program.icon}</span>
-              <span className="text-sm font-extrabold text-slate-900 truncate">{program.shortTitle}</span>
-              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Agent Active
-              </span>
-            </div>
-            {/* Progress bar */}
-            <div className="mt-1.5 flex items-center gap-2">
-              <div className="flex-1 bg-slate-100 rounded-full h-1">
-                <div
-                  className="bg-gradient-to-r from-[#093a96] to-blue-400 h-1 rounded-full transition-all duration-700"
-                  style={{ width: `${progressPct}%` }}
-                />
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <button
+              type="button"
+              onClick={onBack}
+              className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-base">{program.icon}</span>
+                <span className="text-sm font-extrabold text-slate-900 truncate">{program.shortTitle}</span>
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Agent Active
+                </span>
               </div>
-              <span className="text-[10px] font-bold text-slate-500 flex-shrink-0">
-                {stats.total}/{stats.templateTotal}
-              </span>
+              {/* Progress bar */}
+              <div className="mt-1.5 flex items-center gap-2">
+                <div className="flex-1 bg-slate-100 rounded-full h-1">
+                  <div
+                    className="bg-gradient-to-r from-[#093a96] to-blue-400 h-1 rounded-full transition-all duration-700"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-slate-500 flex-shrink-0">
+                  {stats.total}/{stats.templateTotal}
+                </span>
+              </div>
             </div>
           </div>
+
+          {/* Quick Resume/Document Auto-Fill Action */}
+          <button
+            type="button"
+            onClick={() => setShowResumeModal(true)}
+            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#093a96] text-[11px] font-bold border border-blue-200 transition-all cursor-pointer shadow-2xs"
+            title="Upload an image or document to auto-fill application fields"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-[#093a96]" />
+            <span>Auto-Fill from Document</span>
+          </button>
         </div>
+
+        {/* Document Auto-Fill Selector Modal Banner */}
+        {showResumeModal && (
+          <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200 shadow-sm animate-in fade-in space-y-3 z-10 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-extrabold text-[#093a96]">
+                <Sparkles className="w-4 h-4 text-[#093a96]" />
+                <span>Instant Image & Document Auto-Fill</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResumeModal(false)}
+                className="p-1 rounded-lg hover:bg-white/80 text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Upload a document image (PNG, JPG, WebP) or file (PDF, DOCX, TXT) to parse and auto-fill this application.
+            </p>
+
+            {/* Direct file upload dropzone */}
+            <div className="pt-1">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".png,.jpg,.jpeg,.webp,.pdf,.docx,.doc,.txt"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleApplyResumeAutofill(e.target.files[0]);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                disabled={isParsingResume}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-blue-50 border-2 border-dashed border-blue-300 text-xs font-bold text-[#093a96] flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+              >
+                {isParsingResume ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#093a96]" />
+                    <span>Analyzing & parsing document...</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud className="w-4 h-4" />
+                    <span>Click to select or drop image / document file</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 min-h-0">
